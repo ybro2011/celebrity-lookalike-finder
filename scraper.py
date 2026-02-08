@@ -72,7 +72,7 @@ class UltimateScraper:
 
     def scrape(self, celeb_list):
         total = len(celeb_list)
-        print(f"🚀 Starting Tri-Source Stealth Scrape for {total} celebrities...")
+        print(f"starting scrape for {total} celebrities...")
         
         with DDGS() as ddgs:
             for i, name in enumerate(celeb_list):
@@ -85,14 +85,11 @@ class UltimateScraper:
                 self.draw_progress_bar(i + 1, total, f"Searching: {name}")
                 img_data = None
 
-                # try tmdb first
                 img_data = self.get_tmdb_image(name)
                 
-                # wikipedia backup
                 if not img_data or not self.is_face_present(img_data):
                     img_data = self.get_wikipedia_image(name)
 
-                # duckduckgo last resort
                 if not img_data or not self.is_face_present(img_data):
                     try:
                         results = list(ddgs.images(keywords=f"{name} headshot portrait", max_results=2))
@@ -108,11 +105,10 @@ class UltimateScraper:
                     with open(os.path.join(self.base_dir, filename), "wb") as f:
                         f.write(img_data)
                 else:
-                    print(f"\n❌ Failed to find face for {name}")
+                    print(f"\nfailed to find face for {name}")
 
-                # random delay to look human
                 time.sleep(random.uniform(2, 4))
-        print("\n✨ Scrape complete!")
+        print("\nscrape complete!")
 
 if __name__ == "__main__":
     top_celebs = ["Taylor Swift", "Ariana Grande", "Billie Eilish", "Justin Bieber", "Dua Lipa", "Rihanna", "Beyonce", "Lady Gaga", "Shakira", "Drake", "The Weeknd", "Harry Styles", "Olivia Rodrigo", "Selena Gomez", "Kanye West", "Ed Sheeran", "Adele", "Bruno Mars", "Nicki Minaj", "Cardi B", "Bad Bunny", "Rosé", "J Balvin", "Travis Scott", "Zayn Malik", "Doja Cat", "Hozier", "Myles Smith", "Zendaya", "Tom Holland", "Robert Downey Jr", "Scarlett Johansson", "Dwayne Johnson", "Tom Cruise", "Brad Pitt", "Leonardo DiCaprio", "Margot Robbie", "Jennifer Lawrence", "Ryan Reynolds", "Blake Lively", "Timothee Chalamet", "Jenna Ortega", "Cillian Murphy", "Pedro Pascal", "Keanu Reeves", "Will Smith", "Angelina Jolie", "Jennifer Lopez", "Gal Gadot", "Chris Evans", "Chris Hemsworth", "Johnny Depp", "Emma Watson", "Sydney Sweeney", "Millie Bobby Brown", "Ryan Gosling", "Ben Affleck", "Jennifer Aniston", "Adam Sandler", "Caitlin Clark", "Austin Butler", "Jacob Elordi", "Cristiano Ronaldo", "Lionel Messi", "LeBron James", "Stephen Curry", "Lewis Hamilton", "Max Verstappen", "Novak Djokovic", "Serena Williams", "Tiger Woods", "Virat Kohli", "Neymar Jr", "Kylian Mbappe", "Shohei Ohtani", "Patrick Mahomes", "Simone Biles", "Charles Leclerc", "Roger Federer", "Kevin Durant", "Giannis Antetokounmpo", "Elon Musk", "Jeff Bezos", "Bill Gates", "Mark Zuckerberg", "Sam Altman", "Dario Amodei", "Demis Hassabis", "Lisa Su", "Jensen Huang", "Oprah Winfrey", "Kim Kardashian", "Kylie Jenner", "Kendall Jenner", "Joe Rogan", "Jimmy Donaldson", "Khloe Kardashian", "Kris Jenner", "Gigi Hadid", "Bella Hadid", "Donald Trump", "Kamala Harris", "Kate Middleton", "Sabrina Carpenter"]

@@ -19,11 +19,9 @@ import random
 
 app = Flask(__name__)
 
-# global stuff
 matcher = None
 _db_version = 0
-_db_version_lock = threading.Lock()  # might need this later
-# _old_matcher = None  # keeping this just in case
+_db_version_lock = threading.Lock()
 
 
 class CelebrityMatcher:
@@ -40,7 +38,6 @@ class CelebrityMatcher:
         self.celeb_data = []
     
     def get_norm_lms(self, img_bgr):
-        # normalize landmarks so they're centered
         rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         res = self.face_mesh.process(rgb)
         if res.multi_face_landmarks:
@@ -49,7 +46,6 @@ class CelebrityMatcher:
         return None
     
     def load_database(self):
-        # try cache first
         if os.path.exists(self.cache_file):
             try:
                 with open(self.cache_file, 'rb') as f:
@@ -84,7 +80,7 @@ class CelebrityMatcher:
                         name = os.path.splitext(filename)[0]
                         lms = self.get_norm_lms(img_bgr)
                         if lms is None:
-                            lms = np.zeros((468, 2))  # fallback if no landmarks
+                            lms = np.zeros((468, 2))
                         
                         self.celeb_data.append({
                             'name': name,
@@ -104,7 +100,6 @@ class CelebrityMatcher:
         if not self.celeb_data or len(self.celeb_data) == 0:
             return None, None, None
         
-        # resize down for speed
         h, w = frame_rgb.shape[:2]
         new_w = int(w * 0.25)
         new_h = int(h * 0.25)
@@ -154,7 +149,6 @@ def process_frame(img_array, matcher):
                 err1 = errors[conn[0]]
                 err2 = errors[conn[1]]
                 avg_err = (err1 + err2) / 2
-                # green = good match, red = bad match
                 g = max(0, 255 - int(avg_err * 8500))
                 r = min(255, int(avg_err * 8500))
                 
@@ -321,7 +315,6 @@ def suggest_celebrity():
         
         clean_name = name.replace(" ", "_").lower()
         
-        # check if already exists
         existing_files = [f for f in os.listdir(celebs_dir) if f.lower().startswith(clean_name)]
         if existing_files:
             matcher.load_database()
@@ -336,18 +329,15 @@ def suggest_celebrity():
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         
-        # try tmdb first
         img_data = get_tmdb_image(name)
         if img_data and not is_face_present(img_data):
             img_data = None
         
-        # try wikipedia
         if not img_data:
             img_data = get_wikipedia_image(name)
             if img_data and not is_face_present(img_data):
                 img_data = None
         
-        # duckduckgo as last resort
         if not img_data:
             try:
                 with DDGS() as ddgs:

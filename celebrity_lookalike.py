@@ -64,7 +64,13 @@ class CelebrityChallengeUltimate:
                     if lms is not None:
                         name_part = filename.rsplit('_', 1)[0]
                         name = name_part.replace('_', ' ').title()
-                        updated_data.append({"name": name, "enc": encs[0], "lms": lms, "img": cv2.resize(img, (200, 200)), "filename": filename})
+                        updated_data.append({
+                            "name": name, 
+                            "enc": encs[0], 
+                            "lms": lms, 
+                            "img": cv2.resize(img, (200, 200)), 
+                            "filename": filename
+                        })
                         new_encodes += 1
                 else: os.remove(path)
 
