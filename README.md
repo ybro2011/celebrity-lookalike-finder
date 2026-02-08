@@ -18,8 +18,9 @@ use render.com or railway.app (github pages doesnt work for flask apps)
 on render:
 - new web service
 - connect github repo
-- build: `pip install -r requirements.txt`
-- start: `gunicorn app:app --bind 0.0.0.0:$PORT`
+- build: `chmod +x build.sh && ./build.sh`
+- start: `gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120`
+- note: free tier might run out of memory, may need to upgrade to $7/month starter plan
 
 ## stuff
 
