@@ -122,8 +122,22 @@ class CelebrityMatcher:
 # initialize matcher when module loads (needed for gunicorn)
 try:
     matcher = CelebrityMatcher()
-    matcher.load_database()
-    print(f"loaded {len(matcher.celeb_data)} celebrities")
+    celeb_count = len(matcher.celeb_data)
+    print(f"loaded {celeb_count} celebrities")
+    
+    # auto-seed if database is empty (run in background so server starts fast)
+    if celeb_count == 0:
+        print("database empty, seeding celebrities in background...")
+        def seed_background():
+            try:
+                from seed_celebs import seed_celebs
+                seed_celebs()
+                matcher.load_database()
+                print(f"seeded! now have {len(matcher.celeb_data)} celebrities")
+            except Exception as e:
+                print(f"seed failed: {e}")
+        
+        threading.Thread(target=seed_background, daemon=True).start()
 except Exception as e:
     print(f"error initializing matcher: {e}")
     matcher = None
@@ -211,34 +225,55 @@ def process_image():
         if not matcher:
             return jsonify({'error': 'matcher not initialized'}), 500
         
-        processed_img, match, similarity = process_frame(image_array, matcher)
+        try:
+            processed_img, match, similarity = process_frame(image_array, matcher)
+            if processed_img is None:
+                return jsonify({'error': 'failed to process image'}), 500
+        except Exception as e:
+            print(f"error processing frame: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'error processing image: {str(e)}'}), 500
         
         if not match:
             # no match but still show results page
+            try:
+                processed_img_str = image_to_base64(processed_img)
+                return jsonify({
+                    'success': True,
+                    'match_name': 'No celebrities yet',
+                    'similarity': 0.0,
+                    'processed_image': processed_img_str,
+                    'celebrity_image': processed_img_str,
+                    'face_count': len(matcher.celeb_data) if matcher else 0
+                })
+            except Exception as e:
+                print(f"error encoding image: {e}")
+                return jsonify({'error': 'error encoding image'}), 500
+        
+        try:
             processed_img_str = image_to_base64(processed_img)
+            celeb_img = Image.open(match['img_path'])
+            celeb_img_str = image_to_base64(celeb_img)
+            
             return jsonify({
                 'success': True,
-                'match_name': 'No celebrities yet',
-                'similarity': 0.0,
+                'match_name': match['name'],
+                'similarity': float(similarity),
                 'processed_image': processed_img_str,
-                'celebrity_image': processed_img_str,
+                'celebrity_image': celeb_img_str,
                 'face_count': len(matcher.celeb_data) if matcher else 0
             })
-        
-        processed_img_str = image_to_base64(processed_img)
-        celeb_img = Image.open(match['img_path'])
-        celeb_img_str = image_to_base64(celeb_img)
-        
-        return jsonify({
-            'success': True,
-            'match_name': match['name'],
-            'similarity': float(similarity),
-            'processed_image': processed_img_str,
-            'celebrity_image': celeb_img_str,
-            'face_count': len(matcher.celeb_data) if matcher else 0
-        })
+        except Exception as e:
+            print(f"error preparing response: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'error preparing response: {str(e)}'}), 500
         
     except Exception as e:
+        print(f"error in process_image: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
