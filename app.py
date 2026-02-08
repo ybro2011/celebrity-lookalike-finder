@@ -119,6 +119,16 @@ class CelebrityMatcher:
         return self.celeb_data[idx], distance, similarity
 
 
+# initialize matcher when module loads (needed for gunicorn)
+try:
+    matcher = CelebrityMatcher()
+    matcher.load_database()
+    print(f"loaded {len(matcher.celeb_data)} celebrities")
+except Exception as e:
+    print(f"error initializing matcher: {e}")
+    matcher = None
+
+
 def process_frame(img_array, matcher):
     img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
     h, w = img.shape[:2]
@@ -136,7 +146,7 @@ def process_frame(img_array, matcher):
     match = None
     similarity = 0.0
     
-    if results.multi_face_landmarks and matcher.celeb_data:
+    if results.multi_face_landmarks and matcher and matcher.celeb_data:
         match, distance, similarity = matcher.find_match(rgb_img)
         
         if match:
@@ -188,6 +198,9 @@ def process_image():
         image = Image.open(io.BytesIO(file.read()))
         image_array = np.array(image.convert('RGB'))
         
+        if not matcher:
+            return jsonify({'error': 'matcher not initialized'}), 500
+        
         processed_img, match, similarity = process_frame(image_array, matcher)
         
         if not match:
@@ -203,7 +216,7 @@ def process_image():
             'similarity': float(similarity),
             'processed_image': processed_img_str,
             'celebrity_image': celeb_img_str,
-            'face_count': len(matcher.celeb_data)
+            'face_count': len(matcher.celeb_data) if matcher else 0 if matcher else 0
         })
         
     except Exception as e:
@@ -237,7 +250,8 @@ def register_face():
         filepath = os.path.join(celebs_dir, filename)
         cv2.imwrite(filepath, cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR))
         
-        matcher.load_database()
+        if matcher:
+            matcher.load_database()
         
         return jsonify({'success': True, 'message': f'registered {name} successfully!'})
         
@@ -317,7 +331,8 @@ def suggest_celebrity():
         
         existing_files = [f for f in os.listdir(celebs_dir) if f.lower().startswith(clean_name)]
         if existing_files:
-            matcher.load_database()
+            if matcher:
+                matcher.load_database()
             return jsonify({
                 'success': True, 
                 'message': f'{name} already exists!',
@@ -356,7 +371,8 @@ def suggest_celebrity():
             with open(filepath, 'wb') as f:
                 f.write(img_data)
             
-            matcher.load_database()
+            if matcher:
+                matcher.load_database()
             
             return jsonify({
                 'success': True,
@@ -372,9 +388,5 @@ def suggest_celebrity():
 
 
 if __name__ == '__main__':
-    matcher = CelebrityMatcher()
-    matcher.load_database()
-    print(f"loaded {len(matcher.celeb_data)} celebrities")
-    
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
