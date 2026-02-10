@@ -10,15 +10,26 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Set up a new user named "user" with user ID 1000
+RUN useradd -m -u 1000 user
+# Switch to the "user" user
+USER user
+# Set home to the user's home directory
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Set the working directory to the user's home directory
+WORKDIR $HOME/app
 
-COPY . .
+# Copy requirements and install
+COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Create celebs directory if it doesn't exist
-RUN mkdir -p celebs
+# Copy the rest of the application
+COPY --chown=user . .
+
+# Create celebs directory and ensure permissions
+RUN mkdir -p celebs && chown user:user celebs
 
 EXPOSE 7860
 
