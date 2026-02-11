@@ -1,28 +1,16 @@
-# celebrity lookalike
+# celeb lookalike finder
 
-finds which celebrity you look like (Flask Version)
+this is a cool project i made that tells u which famous person u look like. it uses a webcam or u can just upload a pic and it finds ur twin lol.
 
-## how to run locally
+### how to run it
+1. install the stuff: `pip install -r requirements.txt`
+2. run the app: `python app.py`
+3. go to `localhost:5000` in ur browser
 
-```bash
-pip install -r requirements.txt
-python app.py
-```
+### how it works
+it uses some ai face recognition thing to compare ur face to like a bunch of celebrities. if it doesn't see any famous people it will download some new ones in the background.
 
-## hosting (The "Easy" Way)
+i mostly made this for fun so yeah.
 
-### ❌ GitHub Pages / Netlify / Vercel
-These will **not** work for this app. They are for "static" sites (HTML/JS only). This app needs a **Python Server** to run the face-recognition AI.
-
-### ✅ Hugging Face Spaces (Easiest for Flask)
-This is effectively "GitHub Pages for AI apps." It's the only free place that reliably runs the heavy libraries this app uses.
-
-1. **Push your code**: `git push`
-2. Create a **[New Space](https://huggingface.co/new-space)**.
-3. Select **Docker** as the SDK.
-4. **Connect GitHub**: Select your `celebrity-lookalike-finder` repo.
-5. **Add Secret**: In Settings, add `TMDB_API_KEY` so celebrity photos show up.
-6. **Done**: It will build and give you a public URL.
-
-## environment variables
-- `TMDB_API_KEY`: Your The Movie Database API key.
+### stuff u need
+u need a TMDB api key if u want it to show the pictures properly but u have to put that in the environment variables.
