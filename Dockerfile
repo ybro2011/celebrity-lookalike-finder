@@ -40,10 +40,11 @@ RUN sed -i '/dlib/d' requirements.txt && \
 # Copy the rest of the application
 COPY --chown=$MAMBA_USER:$MAMBA_USER . .
 
-# Ensure the celebs directory exists
-RUN mkdir -p celebs
+# Ensure the celebs directory exists and is writable
+RUN mkdir -p /app/celebs && chown -R $MAMBA_USER:$MAMBA_USER /app/celebs
 
 # Hugging Face default port
 EXPOSE 7860
 
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:7860", "--workers", "1", "--timeout", "120"]
+# We use the $PORT env var if provided, otherwise default to 7860
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-7860} --workers 1 --timeout 120 --access-logfile - --error-logfile -"]

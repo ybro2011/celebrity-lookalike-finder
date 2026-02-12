@@ -121,26 +121,32 @@ class CelebrityMatcher:
 
 
 # initialize matcher when module loads (needed for gunicorn)
+print(">>> Starting CelebrityMatcher initialization...", flush=True)
 try:
     matcher = CelebrityMatcher()
     celeb_count = len(matcher.celeb_data)
-    print(f"loaded {celeb_count} celebrities")
+    print(f">>> Successfully loaded {celeb_count} celebrities", flush=True)
     
     # auto-seed if database is empty (run in background so server starts fast)
     if celeb_count == 0:
-        print("database empty, seeding celebrities in background...")
+        print(">>> Database empty, starting background seeder...", flush=True)
         def seed_background():
             try:
+                print(">>> Background seeder thread started", flush=True)
                 from seed_celebs import seed_celebs
-                seed_celebs()
+                added = seed_celebs()
                 matcher.load_database()
-                print(f"seeded! now have {len(matcher.celeb_data)} celebrities")
+                print(f">>> Background seed finished! Added {added} celebs. Total: {len(matcher.celeb_data)}", flush=True)
             except Exception as e:
-                print(f"seed failed: {e}")
+                print(f">>> BACKGROUND SEED FAILED: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
         
         threading.Thread(target=seed_background, daemon=True).start()
 except Exception as e:
-    print(f"error initializing matcher: {e}")
+    print(f">>> CRITICAL: Matcher initialization failed: {e}", flush=True)
+    import traceback
+    traceback.print_exc()
     matcher = None
 
 
