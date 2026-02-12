@@ -27,6 +27,9 @@ RUN micromamba install -y -n base -c conda-forge \
 # Copy requirements
 COPY --chown=$MAMBA_USER:$MAMBA_USER requirements.txt .
 
+# Set environment path to include the micromamba base environment
+ENV PATH="/opt/conda/bin:$PATH"
+
 # Install the remaining lighter packages via pip
 # We remove the heavy ones that we already installed via mamba
 RUN sed -i '/dlib/d' requirements.txt && \
@@ -42,8 +45,5 @@ RUN mkdir -p celebs
 
 # Hugging Face default port
 EXPOSE 7860
-
-# Set environment path to include the micromamba base environment
-ENV PATH="/opt/conda/bin:$PATH"
 
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:7860", "--workers", "1", "--timeout", "120"]
