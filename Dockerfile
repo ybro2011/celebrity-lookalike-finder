@@ -22,6 +22,8 @@ RUN micromamba install -y -n base -c conda-forge \
     pip \
     dlib \
     opencv \
+    face-recognition \
+    face_recognition_models \
     gunicorn \
     && micromamba clean --all --yes
 
@@ -36,6 +38,8 @@ ENV PATH="/opt/conda/bin:$PATH"
 RUN sed -i '/dlib/d' requirements.txt && \
     sed -i '/opencv/d' requirements.txt && \
     sed -i '/gunicorn/d' requirements.txt && \
+    sed -i '/face-recognition/d' requirements.txt && \
+    sed -i '/face_recognition_models/d' requirements.txt && \
     python -m pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
