@@ -7,6 +7,8 @@ import numpy as np
 import time
 import json
 from duckduckgo_search import DDGS
+from PIL import Image
+import io
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY")
 
@@ -124,12 +126,19 @@ def seed_celebs():
                 pass
         
         if img_data and is_face_present(img_data):
-            filename = f"{clean_name}_{int(time.time())}.jpg"
-            filepath = os.path.join(celebs_dir, filename)
-            with open(filepath, 'wb') as f:
-                f.write(img_data)
-            added += 1
-            print(f"added {name} ({added}/{len(celebs)})")
+            try:
+                pil_img = Image.open(io.BytesIO(img_data))
+                if pil_img.mode != 'RGB':
+                    pil_img = pil_img.convert('RGB')
+                
+                filename = f"{clean_name}_{int(time.time())}.jpg"
+                filepath = os.path.join(celebs_dir, filename)
+                pil_img.save(filepath, 'JPEG', quality=95)
+                added += 1
+                print(f"added {name} ({added}/{len(celebs)})")
+            except Exception as e:
+                print(f"error saving {name}: {e}")
+                continue
         
         time.sleep(0.5)
     
