@@ -37,6 +37,7 @@ RUN micromamba install -y -n base -c conda-forge \
 COPY --chown=$MAMBA_USER:$MAMBA_USER requirements.txt .
 
 ENV PATH="/opt/conda/bin:$PATH"
+ENV PORT=8080
 
 RUN sed -i '/dlib/d' requirements.txt && \
     sed -i '/opencv/d' requirements.txt && \
