@@ -30,7 +30,6 @@ RUN micromamba install -y -n base -c conda-forge \
     dlib \
     opencv \
     face-recognition \
-    face_recognition_models \
     gunicorn \
     && micromamba clean --all --yes
 
@@ -43,8 +42,8 @@ RUN sed -i '/dlib/d' requirements.txt && \
     sed -i '/opencv/d' requirements.txt && \
     sed -i '/gunicorn/d' requirements.txt && \
     sed -i '/face-recognition/d' requirements.txt && \
-    sed -i '/face_recognition_models/d' requirements.txt && \
-    python -m pip install --no-cache-dir -r requirements.txt
+    python -m pip install --no-cache-dir -r requirements.txt && \
+    python -m pip install --no-cache-dir git+https://github.com/ageitgey/face_recognition_models
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER . .
 
