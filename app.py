@@ -4,7 +4,16 @@
 from flask import Flask, render_template, request, jsonify
 import cv2
 import mediapipe as mp
-import face_recognition
+try:
+    import face_recognition
+    print(">>> face_recognition imported successfully", flush=True)
+except ImportError as e:
+    print(f">>> face_recognition IMPORT FAILED: {e}", flush=True)
+    import sys
+    print(f">>> sys.path: {sys.path}", flush=True)
+    # The library might print its own error, but this helps us track it
+except Exception as e:
+    print(f">>> face_recognition import error: {e}", flush=True)
 import numpy as np
 import os
 import pickle
