@@ -137,9 +137,12 @@ try:
         def seed_background():
             try:
                 from seed_celebs import seed_celebs
+                print("starting seed process...")
                 added = seed_celebs()
-                matcher.load_database()
-                print(f"seed done, added {added} celebs. total: {len(matcher.celeb_data)}")
+                print(f"seed finished, added {added} images")
+                if matcher:
+                    matcher.load_database()
+                    print(f"database reloaded. total: {len(matcher.celeb_data)}")
             except Exception as e:
                 print(f"seed failed: {e}")
                 import traceback
@@ -218,6 +221,33 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/api/status')
+def status():
+    celeb_count = len(matcher.celeb_data) if matcher else 0
+    celebs_dir = "celebs"
+    file_count = 0
+    if os.path.exists(celebs_dir):
+        file_count = len([f for f in os.listdir(celebs_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+    
+    return jsonify({
+        'celeb_count': celeb_count,
+        'file_count': file_count,
+        'matcher_initialized': matcher is not None
+    })
+
+
+@app.route('/api/reload')
+def reload_database():
+    if matcher:
+        matcher.load_database()
+        return jsonify({
+            'success': True,
+            'count': len(matcher.celeb_data),
+            'message': f'reloaded {len(matcher.celeb_data)} celebrities'
+        })
+    return jsonify({'error': 'matcher not initialized'}), 500
+
+
 @app.route('/api/process_image', methods=['POST'])
 def process_image():
     try:
@@ -233,6 +263,9 @@ def process_image():
         
         if not matcher:
             return jsonify({'error': 'matcher not initialized'}), 500
+        
+        if matcher.celeb_data and len(matcher.celeb_data) == 0:
+            matcher.load_database()
         
         try:
             processed_img, match, similarity = process_frame(image_array, matcher)
