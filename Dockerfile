@@ -47,7 +47,7 @@ RUN sed -i '/dlib/d' requirements.txt && \
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER . .
 
-RUN /opt/conda/bin/python -m pip install --no-cache-dir setuptools && \
+RUN /opt/conda/bin/python -m pip install --no-cache-dir "setuptools<66" && \
     /opt/conda/bin/python -m pip install --no-cache-dir git+https://github.com/ageitgey/face_recognition_models && \
     /opt/conda/bin/python -c "import face_recognition_models; print('face_recognition_models installed successfully')" && \
     mkdir -p /app/celebs && chown -R $MAMBA_USER:$MAMBA_USER /app/celebs
