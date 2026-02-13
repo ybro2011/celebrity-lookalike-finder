@@ -83,9 +83,12 @@ class CelebrityMatcher:
                 if img_bgr is None:
                     try:
                         pil_img = Image.open(filepath)
-                        img_bgr = cv2.cvtColor(np.array(pil_img.convert('RGB')), cv2.COLOR_RGB2BGR)
-                    except:
-                        print(f"failed to read {filename}")
+                        if pil_img.mode != 'RGB':
+                            pil_img = pil_img.convert('RGB')
+                        img_array = np.array(pil_img, dtype=np.uint8)
+                        img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                    except Exception as e:
+                        print(f"failed to read {filename}: {e}")
                         continue
                 
                 if len(img_bgr.shape) != 3 or img_bgr.shape[2] != 3:
@@ -98,7 +101,17 @@ class CelebrityMatcher:
                 if rgb.dtype != np.uint8:
                     rgb = rgb.astype(np.uint8)
                 
-                face_encs = face_recognition.face_encodings(rgb)
+                if rgb.min() < 0 or rgb.max() > 255:
+                    rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+                
+                if not rgb.flags['C_CONTIGUOUS']:
+                    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+                
+                try:
+                    face_encs = face_recognition.face_encodings(rgb)
+                except Exception as e:
+                    print(f"error encoding {filename}: {e}, rgb shape={rgb.shape}, dtype={rgb.dtype}")
+                    continue
                 
                 if face_encs and len(face_encs) > 0:
                     name = os.path.splitext(filename)[0]
@@ -141,6 +154,12 @@ class CelebrityMatcher:
         
         if small_rgb.dtype != np.uint8:
             small_rgb = small_rgb.astype(np.uint8)
+        
+        if small_rgb.min() < 0 or small_rgb.max() > 255:
+            small_rgb = np.clip(small_rgb, 0, 255).astype(np.uint8)
+        
+        if not small_rgb.flags['C_CONTIGUOUS']:
+            small_rgb = np.ascontiguousarray(small_rgb, dtype=np.uint8)
         
         face_encs = face_recognition.face_encodings(small_rgb)
         
@@ -199,6 +218,12 @@ def process_frame(img_array, matcher):
     
     rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     rgb_img = np.ascontiguousarray(rgb_img, dtype=np.uint8)
+    
+    if rgb_img.dtype != np.uint8:
+        rgb_img = rgb_img.astype(np.uint8)
+    
+    if rgb_img.min() < 0 or rgb_img.max() > 255:
+        rgb_img = np.clip(rgb_img, 0, 255).astype(np.uint8)
     
     mp_face_mesh = mp.solutions.face_mesh
     face_mesh = mp_face_mesh.FaceMesh(
@@ -320,10 +345,11 @@ def process_image():
             return jsonify({'error': 'no image selected'}), 400
         
         image = Image.open(io.BytesIO(file.read()))
-        image_array = np.array(image.convert('RGB'))
         
-        if image_array.dtype != np.uint8:
-            image_array = image_array.astype(np.uint8)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        image_array = np.array(image, dtype=np.uint8)
         
         if not matcher:
             return jsonify({'error': 'matcher not initialized'}), 500
@@ -399,10 +425,36 @@ def register_face():
             image_data = image_data.split(',')[1]
         image_bytes = base64.b64decode(image_data)
         image = Image.open(io.BytesIO(image_bytes))
-        image_array = np.array(image.convert('RGB'))
         
-        if image_array.dtype != np.uint8:
-            image_array = image_array.astype(np.uint8)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        image_array = np.array(image, dtype=np.uint8)
+        
+        if len(image_array.shape) != 3 or image_array.shape[2] != 3:
+            return jsonify({'error': 'invalid image format: must be RGB'}), 400
+        
+        rgb = np.ascontiguousarray(image_array, dtype=np.uint8)
+        
+        if rgb.dtype != np.uint8:
+            rgb = rgb.astype(np.uint8)
+        
+        if rgb.min() < 0 or rgb.max() > 255:
+            rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+        
+        if not rgb.flags['C_CONTIGUOUS']:
+            rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+        
+        print(f"register_face: rgb shape={rgb.shape}, dtype={rgb.dtype}, min={rgb.min()}, max={rgb.max()}, contiguous={rgb.flags['C_CONTIGUOUS']}")
+        
+        try:
+            face_encs = face_recognition.face_encodings(rgb)
+        except Exception as e:
+            print(f"face_encodings error: {e}, rgb shape={rgb.shape}, dtype={rgb.dtype}")
+            return jsonify({'error': f'face encoding failed: {str(e)}'}), 400
+        
+        if not face_encs or len(face_encs) == 0:
+            return jsonify({'error': 'no face detected in image'}), 400
         
         celebs_dir = "celebs"
         if not os.path.exists(celebs_dir):
@@ -411,23 +463,8 @@ def register_face():
         filename = f"{name.lower().replace(' ', '_')}_{int(time.time())}.jpg"
         filepath = os.path.join(celebs_dir, filename)
         
-        if len(image_array.shape) != 3 or image_array.shape[2] != 3:
-            return jsonify({'error': 'invalid image format'}), 400
-        
-        img_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+        img_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
         cv2.imwrite(filepath, img_bgr)
-        
-        rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
-        
-        if rgb.dtype != np.uint8:
-            rgb = rgb.astype(np.uint8)
-        
-        face_encs = face_recognition.face_encodings(rgb)
-        
-        if not face_encs or len(face_encs) == 0:
-            os.remove(filepath)
-            return jsonify({'error': 'no face detected in image'}), 400
         
         if matcher:
             matcher.load_database()
