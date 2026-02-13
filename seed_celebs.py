@@ -7,7 +7,6 @@ import numpy as np
 import time
 import json
 from duckduckgo_search import DDGS
-import os
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY")
 
@@ -64,10 +63,28 @@ def seed_celebs():
     if not os.path.exists(celebs_dir):
         os.makedirs(celebs_dir, exist_ok=True)
     
-    # popular celebs to seed
     config_path = os.path.join(os.path.dirname(__file__), "config", "celebs.json")
-    with open(config_path, "r") as f:
-        celebs = json.load(f)["celebs"]
+    try:
+        with open(config_path, "r") as f:
+            celebs = json.load(f)["celebs"]
+    except FileNotFoundError:
+        print(f"config not found, using defaults")
+        celebs = [
+            "Taylor Swift", "Ariana Grande", "Justin Bieber", "Dua Lipa", "Rihanna",
+            "Beyonce", "Lady Gaga", "Drake", "The Weeknd", "Zendaya",
+            "Tom Holland", "Robert Downey Jr", "Scarlett Johansson", "Dwayne Johnson",
+            "Tom Cruise", "Brad Pitt", "Leonardo DiCaprio", "Margot Robbie",
+            "Jennifer Lawrence", "Ryan Reynolds"
+        ]
+    except Exception as e:
+        print(f"error loading config: {e}, using defaults")
+        celebs = [
+            "Taylor Swift", "Ariana Grande", "Justin Bieber", "Dua Lipa", "Rihanna",
+            "Beyonce", "Lady Gaga", "Drake", "The Weeknd", "Zendaya",
+            "Tom Holland", "Robert Downey Jr", "Scarlett Johansson", "Dwayne Johnson",
+            "Tom Cruise", "Brad Pitt", "Leonardo DiCaprio", "Margot Robbie",
+            "Jennifer Lawrence", "Ryan Reynolds"
+        ]
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
@@ -79,25 +96,21 @@ def seed_celebs():
     for name in celebs:
         clean_name = name.replace(" ", "_").lower()
         
-        # check if already exists
         existing = [f for f in os.listdir(celebs_dir) if f.lower().startswith(clean_name)]
         if existing:
             continue
         
         img_data = None
         
-        # try tmdb
         img_data = get_tmdb_image(name)
         if img_data and not is_face_present(img_data):
             img_data = None
         
-        # try wikipedia
         if not img_data:
             img_data = get_wikipedia_image(name)
             if img_data and not is_face_present(img_data):
                 img_data = None
         
-        # try duckduckgo
         if not img_data:
             try:
                 with DDGS() as ddgs:
@@ -118,7 +131,7 @@ def seed_celebs():
             added += 1
             print(f"added {name} ({added}/{len(celebs)})")
         
-        time.sleep(0.5)  # be nice to APIs
+        time.sleep(0.5)
     
     print(f"done! added {added} celebrities")
     return added

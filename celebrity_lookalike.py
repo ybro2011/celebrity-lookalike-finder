@@ -48,7 +48,7 @@ class CelebMatcherApp:
         updated_data = []
         new_encodes = 0
         
-        print("\n--- syncing database ---")
+        print("\nsyncing database...")
         for filename in current_files:
             if filename in cached_filenames:
                 updated_data.append(cached_filenames[filename])
@@ -154,7 +154,7 @@ class CelebMatcherApp:
             key = cv2.waitKey(1) & 0xFF
             
             if self.is_registering:
-                if key == 13: # ENTER
+                if key == 13:
                     if self.user_input_name.strip():
                         filename = f"{self.user_input_name.lower().replace(' ', '_')}_{int(time.time())}.jpg"
                         cv2.imwrite(os.path.join(self.celebs_dir, filename), frame)
@@ -163,10 +163,10 @@ class CelebMatcherApp:
                         self.success_time = time.time()
                         self.is_registering = False
                         self.user_input_name = ""
-                elif key == 27: # ESC
+                elif key == 27:
                     self.is_registering = False
                     self.user_input_name = ""
-                elif key == 8: # BACKSPACE
+                elif key == 8:
                     self.user_input_name = self.user_input_name[:-1]
                 elif 32 <= key <= 126:
                     self.user_input_name += chr(key)
@@ -178,12 +178,4 @@ class CelebMatcherApp:
         cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    CelebrityChallengeUltimate().run()
-
-
-
-
-
-
-
-
+    CelebMatcherApp().run()

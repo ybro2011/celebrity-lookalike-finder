@@ -11,7 +11,7 @@ pip install --no-cache-dir Pillow>=10.0.0
 pip install --no-cache-dir Flask>=3.0.0
 pip install --no-cache-dir gunicorn>=21.2.0
 pip install --no-cache-dir requests>=2.31.0
-pip install --no-cache-dir duckduckgo-search>=8.0.0
+pip install --no-cache-dir duckduckgo-search>=6.0.0
 
 # Install opencv-python (pre-built wheel, faster)
 pip install --no-cache-dir opencv-python-headless>=4.8.0

@@ -9,7 +9,6 @@ import sys
 import json
 import pickle
 from duckduckgo_search import DDGS
-import os
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY") 
 
@@ -73,6 +72,51 @@ class CelebScraper:
         sys.stdout.write(f'\rProgress: [{bar}] {current}/{total} ({int(fraction*100)}%) | {status_text[:30].ljust(30)}')
         sys.stdout.flush()
 
+    def scrape(self, celeb_list):
+        added = 0
+        total = len(celeb_list)
+        
+        for idx, name in enumerate(celeb_list):
+            clean_name = name.replace(" ", "_").lower()
+            existing = [f for f in os.listdir(self.base_dir) if f.lower().startswith(clean_name)]
+            if existing:
+                self.draw_progress_bar(idx + 1, total, f"skipped {name}")
+                continue
+            
+            img_data = None
+            img_data = self.get_tmdb_image(name)
+            if img_data and not self.is_face_present(img_data):
+                img_data = None
+            
+            if not img_data:
+                img_data = self.get_wikipedia_image(name)
+                if img_data and not self.is_face_present(img_data):
+                    img_data = None
+            
+            if not img_data:
+                try:
+                    with DDGS() as ddgs:
+                        results = list(ddgs.images(keywords=f"{name} headshot portrait", max_results=2))
+                        for r in results:
+                            resp = requests.get(r['image'], timeout=5, headers=self.headers)
+                            if resp.status_code == 200 and self.is_face_present(resp.content):
+                                img_data = resp.content
+                                break
+                except:
+                    pass
+            
+            if img_data and self.is_face_present(img_data):
+                filename = f"{clean_name}_{int(time.time())}.jpg"
+                filepath = os.path.join(self.base_dir, filename)
+                with open(filepath, 'wb') as f:
+                    f.write(img_data)
+                added += 1
+                self.draw_progress_bar(idx + 1, total, f"added {name}")
+            else:
+                self.draw_progress_bar(idx + 1, total, f"failed {name}")
+            
+            time.sleep(0.5)
+        
         print("\nscrape complete!")
 
 if __name__ == "__main__":

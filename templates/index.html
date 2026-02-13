@@ -292,8 +292,17 @@ async function initCamera() {
     }
 
     try {
+        const isLocalhost = window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1' ||
+                           window.location.hostname === '';
+        const isHttps = window.location.protocol === 'https:';
+        
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('camera not available, need https or localhost');
+            if (!isLocalhost && !isHttps) {
+                throw new Error('camera requires https or localhost. try http://localhost:5000');
+            } else {
+                throw new Error('camera not supported in this browser');
+            }
         }
         
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -307,10 +316,24 @@ async function initCamera() {
         video.srcObject = stream;
         document.getElementById('error-message').textContent = '';
     } catch (err) {
-        let errorMsg = 'error accessing camera: ' + err.message;
-        if (!navigator.mediaDevices) {
-            errorMsg = 'camera not available, need https or localhost';
+        let errorMsg = '';
+        const isLocalhost = window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1' ||
+                           window.location.hostname === '';
+        const isHttps = window.location.protocol === 'https:';
+        
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            errorMsg = 'camera permission denied. please allow camera access and refresh';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            errorMsg = 'no camera found. use upload button instead';
+        } else if (!navigator.mediaDevices) {
+            errorMsg = 'camera not available. use http://localhost:5000 or enable https';
+        } else if (!isLocalhost && !isHttps) {
+            errorMsg = 'camera requires https or localhost. access via http://localhost:5000';
+        } else {
+            errorMsg = 'camera error: ' + err.message + '. try using upload button';
         }
+        
         const errorEl = document.getElementById('error-message');
         if (errorEl) {
             errorEl.textContent = errorMsg;

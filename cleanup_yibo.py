@@ -11,7 +11,7 @@ if os.path.exists(cache_file):
         with open(cache_file, 'rb') as f:
             celeb_data = pickle.load(f)
         
-        print(f"Loaded {len(celeb_data)} entries from database")
+        print(f"loaded {len(celeb_data)} entries")
         
         original_count = len(celeb_data)
         cleaned_data = []
@@ -23,20 +23,19 @@ if os.path.exists(cache_file):
             if 'yibo' not in name and 'yibo' not in img_path:
                 cleaned_data.append(entry)
             else:
-                print(f"Removing entry: {entry.get('name', 'unknown')} ({entry.get('img_path', 'unknown')})")
+                print(f"removing: {entry.get('name', 'unknown')}")
         
         removed_count = original_count - len(cleaned_data)
-        print(f"\nRemoved {removed_count} yibo entry/entries from database")
+        print(f"\nremoved {removed_count} yibo entries")
         
         with open(cache_file, 'wb') as f:
             pickle.dump(cleaned_data, f)
         
-        print(f"✓ Database cleaned. Remaining entries: {len(cleaned_data)}")
+        print(f"done. remaining: {len(cleaned_data)}")
         
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"error: {e}")
         import traceback
         traceback.print_exc()
 else:
-    print("encodings.pickle not found - will be rebuilt on next run")
-
+    print("encodings.pickle not found")

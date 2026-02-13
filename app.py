@@ -6,14 +6,10 @@ import cv2
 import mediapipe as mp
 try:
     import face_recognition
-    print(">>> face_recognition imported successfully", flush=True)
 except ImportError as e:
-    print(f">>> face_recognition IMPORT FAILED: {e}", flush=True)
-    import sys
-    print(f">>> sys.path: {sys.path}", flush=True)
-    # The library might print its own error, but this helps us track it
+    print(f"face_recognition import failed: {e}")
 except Exception as e:
-    print(f">>> face_recognition import error: {e}", flush=True)
+    print(f"face_recognition error: {e}")
 import numpy as np
 import os
 import pickle
@@ -64,7 +60,7 @@ class CelebrityMatcher:
                         self.celeb_data = data
                         return self.celeb_data
                     else:
-                        print("cache file empty, rebuilding...")
+                        print("cache empty, rebuilding...")
             except Exception as e:
                 print(f"error loading cache: {e}, rebuilding...")
         
@@ -99,7 +95,7 @@ class CelebrityMatcher:
                             'img_path': filepath
                         })
                 except Exception as e:
-                    continue  # skip bad images
+                    continue
         
         with open(self.cache_file, 'wb') as f:
             pickle.dump(self.celeb_data, f)
@@ -129,31 +125,29 @@ class CelebrityMatcher:
         return self.celeb_data[idx], distance, similarity
 
 
-# initialize matcher when module loads (needed for gunicorn)
-print(">>> Starting CelebrityMatcher initialization...", flush=True)
+print("initializing matcher...")
 try:
     matcher = CelebrityMatcher()
+    matcher.load_database()
     celeb_count = len(matcher.celeb_data)
-    print(f">>> Successfully loaded {celeb_count} celebrities", flush=True)
+    print(f"loaded {celeb_count} celebrities")
     
-    # auto-seed if database is empty (run in background so server starts fast)
     if celeb_count == 0:
-        print(">>> Database empty, starting background seeder...", flush=True)
+        print("database empty, seeding in background...")
         def seed_background():
             try:
-                print(">>> Background seeder thread started", flush=True)
                 from seed_celebs import seed_celebs
                 added = seed_celebs()
                 matcher.load_database()
-                print(f">>> Background seed finished! Added {added} celebs. Total: {len(matcher.celeb_data)}", flush=True)
+                print(f"seed done, added {added} celebs. total: {len(matcher.celeb_data)}")
             except Exception as e:
-                print(f">>> BACKGROUND SEED FAILED: {e}", flush=True)
+                print(f"seed failed: {e}")
                 import traceback
                 traceback.print_exc()
         
         threading.Thread(target=seed_background, daemon=True).start()
 except Exception as e:
-    print(f">>> CRITICAL: Matcher initialization failed: {e}", flush=True)
+    print(f"matcher init failed: {e}")
     import traceback
     traceback.print_exc()
     matcher = None
@@ -200,7 +194,6 @@ def process_frame(img_array, matcher):
                 y2 = int(lm_list[conn[1]].y * h)
                 cv2.line(img, (x1, y1), (x2, y2), (0, g, r), 1)
         else:
-            # draw basic mesh in green when no match
             for conn in connections:
                 x1 = int(lm_list[conn[0]].x * w)
                 y1 = int(lm_list[conn[0]].y * h)
@@ -252,7 +245,6 @@ def process_image():
             return jsonify({'error': f'error processing image: {str(e)}'}), 500
         
         if not match:
-            # no match but still show results page
             try:
                 processed_img_str = image_to_base64(processed_img)
                 return jsonify({
@@ -459,4 +451,5 @@ def suggest_celebrity():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    debug_mode = os.environ.get('FLASK_ENV') != 'production' and not os.environ.get('RAILWAY_ENVIRONMENT')
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)

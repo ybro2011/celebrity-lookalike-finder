@@ -39,7 +39,7 @@ class CelebrityMatcher:
                     self.celeb_data = pickle.load(f)
                 return self.celeb_data
             except Exception as e:
-                st.warning(f"Error loading cache: {e}. Rebuilding database...")
+                st.warning(f"error loading cache: {e}")
         
         self.celeb_data = []
         
@@ -180,10 +180,8 @@ def main():
         layout="centered"
     )
     
-    # Style the camera input to be smaller and centered, and set movie theatre background
     st.markdown("""
     <style>
-    /* Movie theatre grey background */
     .stApp {
         background-color: #1a1a1a;
     }
@@ -192,7 +190,6 @@ def main():
         background-color: #1a1a1a;
     }
     
-    /* Hide Streamlit header and menu */
     header[data-testid="stHeader"] {
         background-color: #1a1a1a;
         border-bottom: none;
@@ -210,7 +207,6 @@ def main():
         display: none;
     }
     
-    /* Camera input styling with red movie border */
     div[data-testid="stCameraInput"] {
         max-width: 600px;
         margin: 0 auto;
@@ -225,8 +221,6 @@ def main():
         position: relative;
     }
     
-    
-    /* Yellow lightbulb styling for JavaScript fallback */
     .movie-lightbulb {
         position: absolute;
         width: 14px;
@@ -240,7 +234,6 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
-    # Initialize session state
     if 'show_results' not in st.session_state:
         st.session_state.show_results = False
     if 'processed_img' not in st.session_state:
@@ -252,7 +245,6 @@ def main():
     if 'image_array' not in st.session_state:
         st.session_state.image_array = None
     
-    # Load celebrity data
     try:
         with st.spinner("Loading celebrity database..."):
             matcher, celeb_data = load_celebrity_data(get_db_version())
@@ -263,9 +255,7 @@ def main():
         st.stop()
         return
     
-    # Page 1: Camera view (just camera and button)
     if not st.session_state.show_results:
-        # Add JavaScript to inject lightbulbs around the camera (fallback)
         st.markdown("""
         <script>
         (function() {
@@ -309,28 +299,24 @@ def main():
                 const divOffsetLeft = cameraDiv.offsetLeft;
                 const divOffsetTop = cameraDiv.offsetTop;
                 
-                // Top row - 5 bulbs
                 for (let i = 0; i < numPerSide; i++) {
                     const x = divOffsetLeft + (width / (numPerSide - 1)) * i - 7;
                     const y = divOffsetTop - offset - 7;
                     container.appendChild(createLightbulb(x, y));
                 }
                 
-                // Right side - 3 bulbs (skip corners)
                 for (let i = 1; i < numPerSide - 1; i++) {
                     const x = divOffsetLeft + width + offset - 7;
                     const y = divOffsetTop + (height / (numPerSide - 1)) * i - 7;
                     container.appendChild(createLightbulb(x, y));
                 }
                 
-                // Bottom row - 5 bulbs
                 for (let i = numPerSide - 1; i >= 0; i--) {
                     const x = divOffsetLeft + (width / (numPerSide - 1)) * i - 7;
                     const y = divOffsetTop + height + offset - 7;
                     container.appendChild(createLightbulb(x, y));
                 }
                 
-                // Left side - 3 bulbs (skip corners)
                 for (let i = numPerSide - 2; i > 0; i--) {
                     const x = divOffsetLeft - offset - 7;
                     const y = divOffsetTop + (height / (numPerSide - 1)) * i - 7;
@@ -338,12 +324,10 @@ def main():
                 }
             }
             
-            // Try multiple times to catch Streamlit's rendering
             setTimeout(addLightbulbs, 300);
             setTimeout(addLightbulbs, 800);
             setTimeout(addLightbulbs, 1500);
             
-            // Watch for new elements
             const observer = new MutationObserver(() => {
                 const container = document.querySelector('div[data-testid="stCameraInput"]');
                 if (container && container.dataset.bulbsAdded !== 'true') {
@@ -359,16 +343,13 @@ def main():
         camera_file = st.camera_input("", label_visibility="hidden")
         
         if camera_file is not None:
-            # Convert to PIL Image
             image = Image.open(camera_file)
             image_array = np.array(image.convert('RGB'))
             
-            # Process frame
             with st.spinner("Finding your celebrity match..."):
                 processed_img, match, similarity = process_frame(image_array, matcher)
             
             if match:
-                # Store results and switch to results page
                 st.session_state.processed_img = processed_img
                 st.session_state.match = match
                 st.session_state.similarity = similarity
@@ -378,9 +359,7 @@ def main():
             else:
                 st.warning("No face detected in the image. Please try again.")
     
-    # Page 2: Results view
     else:
-        # Back button
         if st.button("← Take Another Photo"):
             st.session_state.show_results = False
             st.session_state.processed_img = None
@@ -389,7 +368,6 @@ def main():
             st.session_state.image_array = None
             st.rerun()
         
-        # Display results
         if st.session_state.match:
             col1, col2 = st.columns(2)
             
@@ -404,7 +382,6 @@ def main():
                     celeb_img = Image.open(st.session_state.match['img_path'])
                     st.image(celeb_img, caption=st.session_state.match['name'], use_container_width=True)
             
-            # Registration form
             st.divider()
             st.subheader("Register Your Face?")
             with st.form("register_form", clear_on_submit=True):
