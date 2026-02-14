@@ -286,6 +286,73 @@ except Exception as e:
     matcher = None
 
 
+def draw_wireframe_on_image(img_array, match_data=None):
+    """
+    Draw wireframe overlay on an image using MediaPipe face mesh.
+    If match_data is provided, color-code based on landmark matching errors.
+    Otherwise, draw green wireframe.
+    Returns PIL Image with wireframe overlay.
+    """
+    if len(img_array.shape) != 3 or img_array.shape[2] != 3:
+        return Image.fromarray(img_array)
+    
+    if img_array.dtype != np.uint8:
+        img_array = img_array.astype(np.uint8)
+    
+    img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+    h, w = img.shape[:2]
+    
+    rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    rgb_img = np.ascontiguousarray(rgb_img, dtype=np.uint8)
+    
+    if rgb_img.dtype != np.uint8:
+        rgb_img = rgb_img.astype(np.uint8)
+    
+    if rgb_img.min() < 0 or rgb_img.max() > 255:
+        rgb_img = np.clip(rgb_img, 0, 255).astype(np.uint8)
+    
+    mp_face_mesh = mp.solutions.face_mesh
+    face_mesh = mp_face_mesh.FaceMesh(
+        refine_landmarks=True, 
+        max_num_faces=1
+    )
+    
+    results = face_mesh.process(rgb_img)
+    
+    if results.multi_face_landmarks:
+        lm_list = results.multi_face_landmarks[0].landmark
+        connections = mp_face_mesh.FACEMESH_TESSELATION
+        
+        if match_data and 'lms' in match_data:
+            # Color-code based on landmark matching errors
+            curr_lms = np.array([(l.x, l.y) for l in lm_list])
+            curr_norm = curr_lms - curr_lms.mean(axis=0)
+            errors = np.linalg.norm(curr_norm - match_data['lms'], axis=1)
+            for conn in connections:
+                err1 = errors[conn[0]]
+                err2 = errors[conn[1]]
+                avg_err = (err1 + err2) / 2
+                g = max(0, 255 - int(avg_err * 8500))
+                r = min(255, int(avg_err * 8500))
+                
+                x1 = int(lm_list[conn[0]].x * w)
+                y1 = int(lm_list[conn[0]].y * h)
+                x2 = int(lm_list[conn[1]].x * w)
+                y2 = int(lm_list[conn[1]].y * h)
+                cv2.line(img, (x1, y1), (x2, y2), (0, g, r), 1)
+        else:
+            # Draw green wireframe
+            for conn in connections:
+                x1 = int(lm_list[conn[0]].x * w)
+                y1 = int(lm_list[conn[0]].y * h)
+                x2 = int(lm_list[conn[1]].x * w)
+                y2 = int(lm_list[conn[1]].y * h)
+                cv2.line(img, (x1, y1), (x2, y2), (0, 200, 0), 1)
+    
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(img_rgb)
+
+
 def process_frame(img_array, matcher):
     print(f"process_frame: starting, image shape: {img_array.shape}, dtype: {img_array.dtype}", flush=True)
     
@@ -333,38 +400,14 @@ def process_frame(img_array, matcher):
         else:
             print(f"process_frame: matcher not available or database empty", flush=True)
         
-        # Draw wireframe overlay
-        lm_list = results.multi_face_landmarks[0].landmark
-        connections = mp_face_mesh.FACEMESH_TESSELATION
-        
-        if match:
-            curr_lms = np.array([(l.x, l.y) for l in lm_list])
-            curr_norm = curr_lms - curr_lms.mean(axis=0)
-            errors = np.linalg.norm(curr_norm - match['lms'], axis=1)
-            for conn in connections:
-                err1 = errors[conn[0]]
-                err2 = errors[conn[1]]
-                avg_err = (err1 + err2) / 2
-                g = max(0, 255 - int(avg_err * 8500))
-                r = min(255, int(avg_err * 8500))
-                
-                x1 = int(lm_list[conn[0]].x * w)
-                y1 = int(lm_list[conn[0]].y * h)
-                x2 = int(lm_list[conn[1]].x * w)
-                y2 = int(lm_list[conn[1]].y * h)
-                cv2.line(img, (x1, y1), (x2, y2), (0, g, r), 1)
-        else:
-            for conn in connections:
-                x1 = int(lm_list[conn[0]].x * w)
-                y1 = int(lm_list[conn[0]].y * h)
-                x2 = int(lm_list[conn[1]].x * w)
-                y2 = int(lm_list[conn[1]].y * h)
-                cv2.line(img, (x1, y1), (x2, y2), (0, 200, 0), 1)
     else:
         print(f"process_frame: MediaPipe did not detect any faces", flush=True)
     
+    # Draw wireframe overlay on processed image
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb), match, similarity
+    processed_img_with_wireframe = draw_wireframe_on_image(img_rgb, match)
+    
+    return processed_img_with_wireframe, match, similarity
 
 
 def image_to_base64(img):
@@ -503,8 +546,16 @@ def process_image():
         try:
             print(f"process_image: match found! name: {match['name']}, similarity: {similarity:.2f}%", flush=True)
             processed_img_str = image_to_base64(processed_img)
+            
+            # Load celebrity image and add wireframe overlay
             celeb_img = Image.open(match['img_path'])
-            celeb_img_str = image_to_base64(celeb_img)
+            if celeb_img.mode != 'RGB':
+                celeb_img = celeb_img.convert('RGB')
+            celeb_img_array = np.array(celeb_img, dtype=np.uint8)
+            
+            # Draw wireframe on celebrity image using the match's landmark data
+            celeb_img_with_wireframe = draw_wireframe_on_image(celeb_img_array, match)
+            celeb_img_str = image_to_base64(celeb_img_with_wireframe)
             
             # Format the celebrity name for display
             display_name = format_celebrity_name(match['name'])
