@@ -6,6 +6,7 @@ import mediapipe as mp
 import numpy as np
 import time
 import json
+import random
 from ddgs import DDGS
 from PIL import Image
 import io
@@ -130,33 +131,47 @@ def seed_celebs():
                 print(f"  no Wikipedia image for {name}", flush=True)
         
         if not img_data:
-            for attempt in range(3):
-                try:
-                    print(f"  trying DDGS for {name} (attempt {attempt+1})...", flush=True)
-                    time.sleep(1 + attempt * 2)
-                    with DDGS() as ddgs:
-                        results = list(ddgs.images(query=f"{name} headshot portrait", max_results=5))
-                        print(f"  DDGS returned {len(results)} results for {name}", flush=True)
-                        for r in results:
-                            try:
-                                resp = requests.get(r['image'], timeout=10, headers=headers)
-                                if resp.status_code == 200:
-                                    print(f"  downloaded image from DDGS for {name}", flush=True)
-                                    if is_face_present(resp.content):
-                                        img_data = resp.content
-                                        print(f"  face found in DDGS image for {name}", flush=True)
-                                        break
-                                    else:
-                                        print(f"  no face in DDGS image for {name}", flush=True)
-                            except Exception as e:
-                                print(f"  error downloading DDGS image: {e}", flush=True)
-                                continue
-                    if img_data:
-                        break
-                except Exception as e:
-                    print(f"  DDGS error for {name} (attempt {attempt+1}): {e}", flush=True)
-                    if attempt < 2:
-                        time.sleep(2)
+            search_terms = [
+                f"{name} headshot portrait",
+                f"{name} photo",
+                f"{name} face"
+            ]
+            for search_term in search_terms:
+                if img_data:
+                    break
+                for attempt in range(2):
+                    try:
+                        print(f"  trying DDGS for {name} with '{search_term}' (attempt {attempt+1})...", flush=True)
+                        time.sleep(3 + attempt * 3 + random.uniform(1, 3))
+                        with DDGS() as ddgs:
+                            results = list(ddgs.images(query=search_term, max_results=5))
+                            print(f"  DDGS returned {len(results)} results for {name}", flush=True)
+                            for r in results:
+                                try:
+                                    time.sleep(random.uniform(0.5, 1.5))
+                                    resp = requests.get(r['image'], timeout=10, headers=headers)
+                                    if resp.status_code == 200:
+                                        print(f"  downloaded image from DDGS for {name}", flush=True)
+                                        if is_face_present(resp.content):
+                                            img_data = resp.content
+                                            print(f"  face found in DDGS image for {name}", flush=True)
+                                            break
+                                        else:
+                                            print(f"  no face in DDGS image for {name}", flush=True)
+                                except Exception as e:
+                                    print(f"  error downloading DDGS image: {e}", flush=True)
+                                    continue
+                        if img_data:
+                            break
+                    except Exception as e:
+                        error_msg = str(e)
+                        if "403" in error_msg or "Forbidden" in error_msg:
+                            print(f"  DDGS rate limited for {name}, waiting longer...", flush=True)
+                            time.sleep(5 + random.uniform(2, 5))
+                        else:
+                            print(f"  DDGS error for {name} (attempt {attempt+1}): {e}", flush=True)
+                        if attempt < 1:
+                            time.sleep(3)
         
         if img_data:
             if is_face_present(img_data):
@@ -189,7 +204,7 @@ def seed_celebs():
         else:
             print(f"  no image found for {name}", flush=True)
         
-        time.sleep(1)
+        time.sleep(2 + random.uniform(0.5, 1.5))
     
     print(f"done! added {added} celebrities")
     return added

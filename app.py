@@ -183,8 +183,8 @@ class CelebrityMatcher:
         print(f"find_match: checking {len(self.celeb_data)} celebs: {celeb_names}", flush=True)
         print(f"find_match: best match: {self.celeb_data[idx]['name']} with distance={distance:.4f}, similarity={similarity:.2f}%", flush=True)
         
-        if distance > 0.6:
-            print(f"find_match: distance too high ({distance:.4f} > 0.6), no match", flush=True)
+        if distance > 0.75:
+            print(f"find_match: distance too high ({distance:.4f} > 0.75), no match", flush=True)
             return None, None, None
         
         print(f"find_match: matched {self.celeb_data[idx]['name']} with similarity {similarity:.2f}%", flush=True)
@@ -389,13 +389,15 @@ def process_image():
         if not match:
             try:
                 processed_img_str = image_to_base64(processed_img)
+                celeb_count = len(matcher.celeb_data) if matcher else 0
+                match_name = 'No match found' if celeb_count > 0 else 'No celebrities yet'
                 return jsonify({
                     'success': True,
-                    'match_name': 'No celebrities yet',
+                    'match_name': match_name,
                     'similarity': 0.0,
                     'processed_image': processed_img_str,
                     'celebrity_image': processed_img_str,
-                    'face_count': len(matcher.celeb_data) if matcher else 0
+                    'face_count': celeb_count
                 })
             except Exception as e:
                 print(f"error encoding image: {e}")
@@ -508,6 +510,13 @@ def register_face():
             new_count = len(matcher.celeb_data)
             print(f"database reloaded after registering {name}: {old_count} -> {new_count} celebs", flush=True)
             
+            if os.path.exists(celebs_dir):
+                all_files = os.listdir(celebs_dir)
+                print(f"all files in celebs dir: {all_files}", flush=True)
+                expected_prefix = name.lower().replace(' ', '_')
+                matching_files = [f for f in all_files if f.lower().startswith(expected_prefix)]
+                print(f"files matching '{expected_prefix}': {matching_files}", flush=True)
+            
             found = False
             for celeb in matcher.celeb_data:
                 if name.lower().replace(' ', '_') in celeb['name'].lower():
@@ -517,6 +526,7 @@ def register_face():
             
             if not found:
                 print(f"WARNING: registered face '{name}' not found in database after reload!", flush=True)
+                print(f"all celeb names in database: {[c['name'] for c in matcher.celeb_data]}", flush=True)
         
         return jsonify({
             'success': True, 
