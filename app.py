@@ -287,7 +287,10 @@ except Exception as e:
 
 
 def process_frame(img_array, matcher):
+    print(f"process_frame: starting, image shape: {img_array.shape}, dtype: {img_array.dtype}", flush=True)
+    
     if len(img_array.shape) != 3 or img_array.shape[2] != 3:
+        print(f"process_frame: invalid image shape: {img_array.shape}", flush=True)
         return None, None, None
     
     if img_array.dtype != np.uint8:
@@ -295,6 +298,7 @@ def process_frame(img_array, matcher):
     
     img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
     h, w = img.shape[:2]
+    print(f"process_frame: image dimensions: {w}x{h}", flush=True)
     
     rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     rgb_img = np.ascontiguousarray(rgb_img, dtype=np.uint8)
@@ -317,8 +321,19 @@ def process_frame(img_array, matcher):
     similarity = 0.0
     
     if results.multi_face_landmarks:
+        num_faces = len(results.multi_face_landmarks)
+        print(f"process_frame: MediaPipe detected {num_faces} face(s)", flush=True)
         if matcher and matcher.celeb_data and len(matcher.celeb_data) > 0:
+            print(f"process_frame: calling find_match with {len(matcher.celeb_data)} celebrities in database", flush=True)
             match, distance, similarity = matcher.find_match(rgb_img)
+            if match:
+                print(f"process_frame: match found: {match['name']}, similarity: {similarity:.2f}%", flush=True)
+            else:
+                print(f"process_frame: no match found (match is None)", flush=True)
+        else:
+            print(f"process_frame: matcher not available or database empty", flush=True)
+    else:
+        print(f"process_frame: MediaPipe did not detect any faces", flush=True)
         
         lm_list = results.multi_face_landmarks[0].landmark
         connections = mp_face_mesh.FACEMESH_TESSELATION
@@ -423,14 +438,19 @@ def trigger_seed():
 @app.route('/api/process_image', methods=['POST'])
 def process_image():
     try:
+        print("process_image: request received", flush=True)
         if 'image' not in request.files:
+            print("process_image: no image in request.files", flush=True)
             return jsonify({'error': 'no image provided'}), 400
         
         file = request.files['image']
         if file.filename == '':
+            print("process_image: empty filename", flush=True)
             return jsonify({'error': 'no image selected'}), 400
         
+        print(f"process_image: processing file: {file.filename}", flush=True)
         image = Image.open(io.BytesIO(file.read()))
+        print(f"process_image: image loaded, size: {image.size}, mode: {image.mode}", flush=True)
         
         if image.mode != 'RGB':
             image = image.convert('RGB')
@@ -438,24 +458,31 @@ def process_image():
         image_array = np.array(image, dtype=np.uint8)
         
         if not matcher:
+            print("process_image: matcher not initialized", flush=True)
             return jsonify({'error': 'matcher not initialized'}), 500
         
         if matcher.celeb_data and len(matcher.celeb_data) == 0:
+            print("process_image: database empty, reloading...", flush=True)
             if os.path.exists(matcher.cache_file):
                 os.remove(matcher.cache_file)
             matcher.load_database(force_rebuild=True)
         
+        print(f"process_image: database has {len(matcher.celeb_data)} celebrities", flush=True)
+        
         try:
             processed_img, match, similarity = process_frame(image_array, matcher)
             if processed_img is None:
+                print("process_image: processed_img is None", flush=True)
                 return jsonify({'error': 'failed to process image'}), 500
+            print(f"process_image: frame processed, match: {match is not None}, similarity: {similarity}", flush=True)
         except Exception as e:
-            print(f"error processing frame: {e}")
+            print(f"error processing frame: {e}", flush=True)
             import traceback
             traceback.print_exc()
             return jsonify({'error': f'error processing image: {str(e)}'}), 500
         
         if not match:
+            print("process_image: no match found, returning 'No match found' response", flush=True)
             try:
                 processed_img_str = image_to_base64(processed_img)
                 celeb_count = len(matcher.celeb_data) if matcher else 0
@@ -473,12 +500,14 @@ def process_image():
                 return jsonify({'error': 'error encoding image'}), 500
         
         try:
+            print(f"process_image: match found! name: {match['name']}, similarity: {similarity:.2f}%", flush=True)
             processed_img_str = image_to_base64(processed_img)
             celeb_img = Image.open(match['img_path'])
             celeb_img_str = image_to_base64(celeb_img)
             
             # Format the celebrity name for display
             display_name = format_celebrity_name(match['name'])
+            print(f"process_image: formatted display name: {display_name}", flush=True)
             
             return jsonify({
                 'success': True,
