@@ -30,6 +30,12 @@ celebs/*.jpeg
 celebs/*.png
 !celebs/README.md
 
+# Preload folder - images here WILL be committed to git
+# Put images you want to deploy in preload/ folder
+# preload/*.jpg
+# preload/*.jpeg
+# preload/*.png
+
 # Cache files (can be regenerated)
 *.pickle
 encodings.pickle

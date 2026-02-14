@@ -67,17 +67,33 @@ class CelebrityMatcher:
         
         self.celeb_data = []
         
+        preload_dir = "preload"
+        all_image_files = []
+        
+        if os.path.exists(preload_dir):
+            preload_files = os.listdir(preload_dir)
+            preload_images = [f for f in preload_files if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+            for img in preload_images:
+                all_image_files.append(os.path.join(preload_dir, img))
+            print(f"found {len(preload_images)} image files in preload dir", flush=True)
+        
         if not os.path.exists(self.celebs_dir):
             os.makedirs(self.celebs_dir, exist_ok=True)
-            print("celebs dir created, empty")
+        else:
+            files = os.listdir(self.celebs_dir)
+            image_files = [f for f in files if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+            for img in image_files:
+                all_image_files.append(os.path.join(self.celebs_dir, img))
+            print(f"found {len(image_files)} image files in celebs dir", flush=True)
+        
+        if len(all_image_files) == 0:
+            print("no image files found in preload or celebs dirs", flush=True)
             return self.celeb_data
         
-        files = os.listdir(self.celebs_dir)
-        image_files = [f for f in files if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-        print(f"found {len(image_files)} image files in celebs dir", flush=True)
+        print(f"total {len(all_image_files)} image files to process", flush=True)
         
-        for filename in image_files:
-            filepath = os.path.join(self.celebs_dir, filename)
+        for filepath in all_image_files:
+            filename = os.path.basename(filepath)
             try:
                 rgb = None
                 try:
