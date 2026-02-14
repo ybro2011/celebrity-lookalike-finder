@@ -450,9 +450,19 @@ def register_face():
             pil_img.save(filepath, 'JPEG', quality=95)
             
             rgb = face_recognition.load_image_file(filepath)
+            
+            if rgb.dtype != np.uint8:
+                rgb = rgb.astype(np.uint8)
+            
+            rgb = rgb.copy()
             rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
             
-            print(f"register_face: rgb shape={rgb.shape}, dtype={rgb.dtype}, min={rgb.min()}, max={rgb.max()}", flush=True)
+            if len(rgb.shape) != 3 or rgb.shape[2] != 3:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                return jsonify({'error': 'invalid image format'}), 400
+            
+            print(f"register_face: rgb shape={rgb.shape}, dtype={rgb.dtype}, min={rgb.min()}, max={rgb.max()}, contiguous={rgb.flags[\"C_CONTIGUOUS\"]}", flush=True)
             
             face_encs = face_recognition.face_encodings(rgb)
             
@@ -580,7 +590,7 @@ def suggest_celebrity():
         if not img_data:
             try:
                 with DDGS() as ddgs:
-                    results = list(ddgs.images(keywords=f"{name} headshot portrait", max_results=3))
+                    results = list(ddgs.images(query=f"{name} headshot portrait", max_results=3))
                     for r in results:
                         resp = requests.get(r['image'], timeout=5, headers=headers)
                         if resp.status_code == 200 and is_face_present(resp.content):

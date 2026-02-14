@@ -133,7 +133,7 @@ def seed_celebs():
             try:
                 print(f"  trying DDGS for {name}...", flush=True)
                 with DDGS() as ddgs:
-                    results = list(ddgs.images(keywords=f"{name} headshot portrait", max_results=3))
+                    results = list(ddgs.images(query=f"{name} headshot portrait", max_results=3))
                     print(f"  DDGS returned {len(results)} results for {name}", flush=True)
                     for r in results:
                         try:
