@@ -9,6 +9,7 @@ import json
 from duckduckgo_search import DDGS
 from PIL import Image
 import io
+import traceback
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY")
 
@@ -131,6 +132,16 @@ def seed_celebs():
                 if pil_img.mode != 'RGB':
                     pil_img = pil_img.convert('RGB')
                 
+                img_array = np.array(pil_img, dtype=np.uint8)
+                img_array = np.ascontiguousarray(img_array, dtype=np.uint8)
+                
+                h, w = img_array.shape[:2]
+                if h > 2000 or w > 2000:
+                    scale = min(2000.0 / h, 2000.0 / w)
+                    new_w = int(w * scale)
+                    new_h = int(h * scale)
+                    pil_img = pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                
                 filename = f"{clean_name}_{int(time.time())}.jpg"
                 filepath = os.path.join(celebs_dir, filename)
                 pil_img.save(filepath, 'JPEG', quality=95)
@@ -138,6 +149,8 @@ def seed_celebs():
                 print(f"added {name} ({added}/{len(celebs)})")
             except Exception as e:
                 print(f"error saving {name}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         time.sleep(0.5)

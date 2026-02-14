@@ -79,11 +79,24 @@ class CelebrityMatcher:
         for filename in image_files:
             filepath = os.path.join(self.celebs_dir, filename)
             try:
-                rgb = face_recognition.load_image_file(filepath)
+                rgb = None
+                try:
+                    rgb = face_recognition.load_image_file(filepath)
+                except:
+                    try:
+                        pil_img = Image.open(filepath)
+                        if pil_img.mode != 'RGB':
+                            pil_img = pil_img.convert('RGB')
+                        rgb = np.array(pil_img, dtype=np.uint8)
+                    except Exception as e:
+                        print(f"failed to load {filename}: {e}", flush=True)
+                        continue
                 
-                if len(rgb.shape) != 3 or rgb.shape[2] != 3:
-                    print(f"invalid image format for {filename}: shape {rgb.shape}", flush=True)
+                if rgb is None or len(rgb.shape) != 3 or rgb.shape[2] != 3:
+                    print(f"invalid image format for {filename}: shape {rgb.shape if rgb is not None else 'None'}", flush=True)
                     continue
+                
+                rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
                 h, w = rgb.shape[:2]
                 if h > 2000 or w > 2000:
@@ -91,13 +104,14 @@ class CelebrityMatcher:
                     new_w = int(w * scale)
                     new_h = int(h * scale)
                     rgb = cv2.resize(rgb, (new_w, new_h))
+                    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
                 img_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                 
                 try:
                     face_encs = face_recognition.face_encodings(rgb)
                 except Exception as e:
-                    print(f"error encoding {filename}: {e}", flush=True)
+                    print(f"error encoding {filename}: {e}, shape={rgb.shape}, dtype={rgb.dtype}", flush=True)
                     continue
                 
                 if face_encs and len(face_encs) > 0:
@@ -421,11 +435,13 @@ def register_face():
         filename = f"{name.lower().replace(' ', '_')}_{int(time.time())}.jpg"
         filepath = os.path.join(celebs_dir, filename)
         
-        with open(filepath, 'wb') as f:
-            f.write(image_bytes)
-        
         try:
-            rgb = face_recognition.load_image_file(filepath)
+            pil_img = Image.open(io.BytesIO(image_bytes))
+            if pil_img.mode != 'RGB':
+                pil_img = pil_img.convert('RGB')
+            
+            rgb = np.array(pil_img, dtype=np.uint8)
+            rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
             
             h, w = rgb.shape[:2]
             if h > 2000 or w > 2000:
@@ -433,18 +449,23 @@ def register_face():
                 new_w = int(w * scale)
                 new_h = int(h * scale)
                 rgb = cv2.resize(rgb, (new_w, new_h))
+                rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
             
             face_encs = face_recognition.face_encodings(rgb)
+            
+            if face_encs and len(face_encs) > 0:
+                img_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(filepath, img_bgr)
+            else:
+                return jsonify({'error': 'no face detected in image'}), 400
         except Exception as e:
             if os.path.exists(filepath):
                 os.remove(filepath)
             print(f"face_encodings error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             return jsonify({'error': f'face encoding failed: {str(e)}'}), 400
         
-        if not face_encs or len(face_encs) == 0:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-            return jsonify({'error': 'no face detected in image'}), 400
         
         if matcher:
             matcher.load_database()
@@ -569,11 +590,14 @@ def suggest_celebrity():
         if img_data and is_face_present(img_data):
             filename = f"{clean_name}_{int(time.time())}.jpg"
             filepath = os.path.join(celebs_dir, filename)
-            with open(filepath, 'wb') as f:
-                f.write(img_data)
             
             try:
-                rgb = face_recognition.load_image_file(filepath)
+                pil_img = Image.open(io.BytesIO(img_data))
+                if pil_img.mode != 'RGB':
+                    pil_img = pil_img.convert('RGB')
+                
+                rgb = np.array(pil_img, dtype=np.uint8)
+                rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
                 h, w = rgb.shape[:2]
                 if h > 2000 or w > 2000:
@@ -581,17 +605,20 @@ def suggest_celebrity():
                     new_w = int(w * scale)
                     new_h = int(h * scale)
                     rgb = cv2.resize(rgb, (new_w, new_h))
+                    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
                 face_encs = face_recognition.face_encodings(rgb)
                 if not face_encs or len(face_encs) == 0:
-                    os.remove(filepath)
                     return jsonify({
                         'error': f'no face detected in image for {name}'
                     }), 400
+                
+                img_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(filepath, img_bgr)
             except Exception as e:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
                 print(f"error validating face for {name}: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
                 return jsonify({
                     'error': f'failed to process image for {name}: {str(e)}'
                 }), 400
@@ -637,10 +664,13 @@ def upload_image():
         filename = f"{name.lower().replace(' ', '_')}_{int(time.time())}.jpg"
         filepath = os.path.join(celebs_dir, filename)
         
-        file.save(filepath)
-        
         try:
-            rgb = face_recognition.load_image_file(filepath)
+            pil_img = Image.open(file)
+            if pil_img.mode != 'RGB':
+                pil_img = pil_img.convert('RGB')
+            
+            rgb = np.array(pil_img, dtype=np.uint8)
+            rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
             
             h, w = rgb.shape[:2]
             if h > 2000 or w > 2000:
@@ -648,17 +678,18 @@ def upload_image():
                 new_w = int(w * scale)
                 new_h = int(h * scale)
                 rgb = cv2.resize(rgb, (new_w, new_h))
-                img_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-                cv2.imwrite(filepath, img_bgr)
+                rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
             
             face_encs = face_recognition.face_encodings(rgb)
             if not face_encs or len(face_encs) == 0:
-                os.remove(filepath)
                 return jsonify({'error': 'no face detected in image'}), 400
+            
+            img_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(filepath, img_bgr)
         except Exception as e:
-            if os.path.exists(filepath):
-                os.remove(filepath)
             print(f"error processing uploaded image: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             return jsonify({'error': f'failed to process image: {str(e)}'}), 400
         
         if matcher:
