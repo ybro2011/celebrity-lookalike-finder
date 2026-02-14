@@ -51,8 +51,11 @@ class CelebrityMatcher:
             return coords - coords.mean(axis=0)
         return None
     
-    def load_database(self):
-        if os.path.exists(self.cache_file):
+    def load_database(self, force_rebuild=False):
+        cache_exists = os.path.exists(self.cache_file)
+        print(f"load_database: cache file exists: {cache_exists}, path: {self.cache_file}, force_rebuild: {force_rebuild}", flush=True)
+        
+        if cache_exists and not force_rebuild:
             try:
                 with open(self.cache_file, 'rb') as f:
                     data = pickle.load(f)
@@ -63,8 +66,11 @@ class CelebrityMatcher:
                     else:
                         print("cache empty, rebuilding...", flush=True)
             except Exception as e:
-                print(f"error loading cache: {e}, rebuilding...")
+                print(f"error loading cache: {e}, rebuilding...", flush=True)
+                import traceback
+                traceback.print_exc()
         
+        print("rebuilding database from images...", flush=True)
         self.celeb_data = []
         
         preload_dir = "preload"
@@ -79,37 +85,46 @@ class CelebrityMatcher:
         
         if not os.path.exists(self.celebs_dir):
             os.makedirs(self.celebs_dir, exist_ok=True)
+            print(f"created celebs dir: {self.celebs_dir}", flush=True)
         else:
             files = os.listdir(self.celebs_dir)
             image_files = [f for f in files if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
             for img in image_files:
                 all_image_files.append(os.path.join(self.celebs_dir, img))
-            print(f"found {len(image_files)} image files in celebs dir", flush=True)
+            print(f"found {len(image_files)} image files in celebs dir: {image_files[:10]}...", flush=True)
         
         if len(all_image_files) == 0:
             print("no image files found in preload or celebs dirs", flush=True)
             return self.celeb_data
         
         print(f"total {len(all_image_files)} image files to process", flush=True)
+        print(f"image files list: {[os.path.basename(f) for f in all_image_files[:20]]}...", flush=True)
+        
+        processed_count = 0
+        encoded_count = 0
+        failed_count = 0
         
         for filepath in all_image_files:
             filename = os.path.basename(filepath)
+            processed_count += 1
             try:
                 rgb = None
                 try:
                     rgb = face_recognition.load_image_file(filepath)
-                except:
+                except Exception as e1:
                     try:
                         pil_img = Image.open(filepath)
                         if pil_img.mode != 'RGB':
                             pil_img = pil_img.convert('RGB')
                         rgb = np.array(pil_img, dtype=np.uint8)
-                    except Exception as e:
-                        print(f"failed to load {filename}: {e}", flush=True)
+                    except Exception as e2:
+                        print(f"failed to load {filename}: face_recognition error={e1}, PIL error={e2}", flush=True)
+                        failed_count += 1
                         continue
                 
                 if rgb is None or len(rgb.shape) != 3 or rgb.shape[2] != 3:
                     print(f"invalid image format for {filename}: shape {rgb.shape if rgb is not None else 'None'}", flush=True)
+                    failed_count += 1
                     continue
                 
                 rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
@@ -128,6 +143,7 @@ class CelebrityMatcher:
                     face_encs = face_recognition.face_encodings(rgb, num_jitters=1)
                 except Exception as e:
                     print(f"error encoding {filename}: {e}, shape={rgb.shape}, dtype={rgb.dtype}", flush=True)
+                    failed_count += 1
                     continue
                 
                 if face_encs and len(face_encs) > 0:
@@ -142,13 +158,18 @@ class CelebrityMatcher:
                         'lms': lms,
                         'img_path': filepath
                     })
-                    print(f"encoded {filename}", flush=True)
+                    encoded_count += 1
+                    print(f"encoded {filename} -> name: {name}", flush=True)
                 else:
                     print(f"no face found in {filename}", flush=True)
+                    failed_count += 1
             except Exception as e:
-                print(f"error processing {filename}: {e}")
+                print(f"error processing {filename}: {e}", flush=True)
                 import traceback
                 traceback.print_exc()
+                failed_count += 1
+        
+        print(f"load_database complete: processed={processed_count}, encoded={encoded_count}, failed={failed_count}", flush=True)
         
         print(f"database loaded: {len(self.celeb_data)} celebrities", flush=True)
         with open(self.cache_file, 'wb') as f:
@@ -336,7 +357,10 @@ def status():
 @app.route('/api/reload')
 def reload_database():
     if matcher:
-        matcher.load_database()
+        if os.path.exists(matcher.cache_file):
+            os.remove(matcher.cache_file)
+            print(f"cleared cache to force reload", flush=True)
+        matcher.load_database(force_rebuild=True)
         return jsonify({
             'success': True,
             'count': len(matcher.celeb_data),
@@ -357,7 +381,10 @@ def trigger_seed():
             added = seed_celebs()
             print(f"seed finished, added {added} images")
             if matcher:
-                matcher.load_database()
+                if os.path.exists(matcher.cache_file):
+                    os.remove(matcher.cache_file)
+                    print(f"cleared cache to force reload", flush=True)
+                matcher.load_database(force_rebuild=True)
                 print(f"database reloaded. total: {len(matcher.celeb_data)}")
         except Exception as e:
             print(f"seed failed: {e}")
@@ -389,7 +416,9 @@ def process_image():
             return jsonify({'error': 'matcher not initialized'}), 500
         
         if matcher.celeb_data and len(matcher.celeb_data) == 0:
-            matcher.load_database()
+            if os.path.exists(matcher.cache_file):
+                os.remove(matcher.cache_file)
+            matcher.load_database(force_rebuild=True)
         
         try:
             processed_img, match, similarity = process_frame(image_array, matcher)
@@ -482,6 +511,14 @@ def register_face():
             
             pil_img.save(filepath, 'JPEG', quality=95)
             
+            # Ensure file is written and exists
+            import time
+            time.sleep(0.1)  # Small delay to ensure file is fully written
+            if not os.path.exists(filepath):
+                return jsonify({'error': 'failed to save image file'}), 500
+            
+            print(f"register_face: saved image to {filepath}, file size: {os.path.getsize(filepath)} bytes", flush=True)
+            
             rgb = face_recognition.load_image_file(filepath)
             
             if rgb.dtype != np.uint8:
@@ -514,7 +551,21 @@ def register_face():
         
         if matcher:
             old_count = len(matcher.celeb_data)
-            matcher.load_database()
+            cache_path = matcher.cache_file
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+                print(f"cleared cache file: {cache_path}", flush=True)
+                # Verify deletion
+                if os.path.exists(cache_path):
+                    print(f"WARNING: cache file still exists after deletion!", flush=True)
+                else:
+                    print(f"cache file successfully deleted", flush=True)
+            else:
+                print(f"cache file does not exist: {cache_path}", flush=True)
+            
+            # Force rebuild by clearing celeb_data first
+            matcher.celeb_data = []
+            matcher.load_database(force_rebuild=True)
             new_count = len(matcher.celeb_data)
             print(f"database reloaded after registering {name}: {old_count} -> {new_count} celebs", flush=True)
             
@@ -525,14 +576,22 @@ def register_face():
                 matching_files = [f for f in all_files if f.lower().startswith(expected_prefix)]
                 print(f"files matching '{expected_prefix}': {matching_files}", flush=True)
             
-            found = False
+            # Check for exact matches first, then partial matches
+            found_exact = False
+            found_partial = False
             for celeb in matcher.celeb_data:
-                if name.lower().replace(' ', '_') in celeb['name'].lower():
-                    print(f"found registered face '{name}' in database as '{celeb['name']}'", flush=True)
-                    found = True
+                celeb_name_lower = celeb['name'].lower()
+                name_lower = name.lower().replace(' ', '_')
+                if celeb_name_lower == name_lower or celeb_name_lower.startswith(name_lower + '_'):
+                    print(f"found registered face '{name}' in database as '{celeb['name']}' (exact match)", flush=True)
+                    found_exact = True
                     break
+                elif name_lower in celeb_name_lower:
+                    if not found_partial:
+                        print(f"found partial match: '{name}' matches '{celeb['name']}'", flush=True)
+                        found_partial = True
             
-            if not found:
+            if not found_exact and not found_partial:
                 print(f"WARNING: registered face '{name}' not found in database after reload!", flush=True)
                 print(f"all celeb names in database: {[c['name'] for c in matcher.celeb_data]}", flush=True)
         
@@ -624,7 +683,9 @@ def suggest_celebrity():
         existing_files = [f for f in os.listdir(celebs_dir) if f.lower().startswith(clean_name)]
         if existing_files:
             if matcher:
-                matcher.load_database()
+                if os.path.exists(matcher.cache_file):
+                    os.remove(matcher.cache_file)
+                matcher.load_database(force_rebuild=True)
             return jsonify({
                 'success': True, 
                 'message': f'{name} already exists!',
@@ -700,7 +761,10 @@ def suggest_celebrity():
                 }), 400
             
             if matcher:
-                matcher.load_database()
+                if os.path.exists(matcher.cache_file):
+                    os.remove(matcher.cache_file)
+                    print(f"cleared cache to force reload", flush=True)
+                matcher.load_database(force_rebuild=True)
                 print(f"database reloaded after adding {name}, total: {len(matcher.celeb_data)}", flush=True)
             
             return jsonify({
@@ -771,7 +835,10 @@ def upload_image():
             return jsonify({'error': f'failed to process image: {str(e)}'}), 400
         
         if matcher:
-            matcher.load_database()
+            if os.path.exists(matcher.cache_file):
+                os.remove(matcher.cache_file)
+                print(f"cleared cache to force reload", flush=True)
+            matcher.load_database(force_rebuild=True)
         
         return jsonify({
             'success': True,
@@ -847,7 +914,10 @@ def upload_bulk():
                 results.append({'file': file.filename, 'status': 'failed', 'reason': str(e)})
         
         if matcher and added > 0:
-            matcher.load_database()
+            if os.path.exists(matcher.cache_file):
+                os.remove(matcher.cache_file)
+                print(f"cleared cache to force reload", flush=True)
+            matcher.load_database(force_rebuild=True)
         
         return jsonify({
             'success': True,
