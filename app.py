@@ -115,8 +115,8 @@ class CelebrityMatcher:
                 rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
                 h, w = rgb.shape[:2]
-                if h > 2000 or w > 2000:
-                    scale = min(2000.0 / h, 2000.0 / w)
+                if h > 800 or w > 800:
+                    scale = min(800.0 / h, 800.0 / w)
                     new_w = int(w * scale)
                     new_h = int(h * scale)
                     rgb = cv2.resize(rgb, (new_w, new_h))
@@ -199,9 +199,8 @@ class CelebrityMatcher:
         print(f"find_match: checking {len(self.celeb_data)} celebs: {celeb_names}", flush=True)
         print(f"find_match: best match: {self.celeb_data[idx]['name']} with distance={distance:.4f}, similarity={similarity:.2f}%", flush=True)
         
-        if distance > 0.75:
-            print(f"find_match: distance too high ({distance:.4f} > 0.75), no match", flush=True)
-            return None, None, None
+        if distance > 0.6:
+            print(f"find_match: distance high ({distance:.4f} > 0.6), but returning best match anyway", flush=True)
         
         print(f"find_match: matched {self.celeb_data[idx]['name']} with similarity {similarity:.2f}%", flush=True)
         
@@ -475,13 +474,6 @@ def register_face():
                 pil_img = pil_img.convert('RGB')
             
             h, w = pil_img.size[1], pil_img.size[0]
-            if h > 2000 or w > 2000:
-                scale = min(2000.0 / h, 2000.0 / w)
-                new_w = int(w * scale)
-                new_h = int(h * scale)
-                pil_img = pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            
-            h, w = pil_img.size[1], pil_img.size[0]
             if h > 800 or w > 800:
                 scale = min(800.0 / h, 800.0 / w)
                 new_w = int(w * scale)
@@ -684,14 +676,14 @@ def suggest_celebrity():
                 rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
                 h, w = rgb.shape[:2]
-                if h > 2000 or w > 2000:
-                    scale = min(2000.0 / h, 2000.0 / w)
+                if h > 800 or w > 800:
+                    scale = min(800.0 / h, 800.0 / w)
                     new_w = int(w * scale)
                     new_h = int(h * scale)
                     rgb = cv2.resize(rgb, (new_w, new_h))
                     rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
-                face_encs = face_recognition.face_encodings(rgb)
+                face_encs = face_recognition.face_encodings(rgb, num_jitters=1)
                 if not face_encs or len(face_encs) == 0:
                     return jsonify({
                         'error': f'no face detected in image for {name}'
