@@ -22,12 +22,37 @@ import requests
 from ddgs import DDGS
 import random
 import json
+import re
 
 app = Flask(__name__)
 
 matcher = None
 _db_version = 0
 _db_version_lock = threading.Lock()
+
+
+def format_celebrity_name(filename_name):
+    """
+    Convert filename format (e.g., 'max_verstappen_1767003749') to proper name (e.g., 'Max Verstappen').
+    Removes timestamp suffix and converts underscores to spaces with proper capitalization.
+    """
+    if not filename_name:
+        return filename_name
+    
+    # Remove file extension if present
+    name = filename_name.rsplit('.', 1)[0]
+    
+    # Remove timestamp suffix (last underscore followed by numbers)
+    # Pattern: underscore followed by digits at the end
+    name = re.sub(r'_\d+$', '', name)
+    
+    # Convert underscores to spaces
+    name = name.replace('_', ' ')
+    
+    # Title case (capitalize first letter of each word)
+    name = name.title()
+    
+    return name
 
 
 class CelebrityMatcher:
@@ -452,9 +477,12 @@ def process_image():
             celeb_img = Image.open(match['img_path'])
             celeb_img_str = image_to_base64(celeb_img)
             
+            # Format the celebrity name for display
+            display_name = format_celebrity_name(match['name'])
+            
             return jsonify({
                 'success': True,
-                'match_name': match['name'],
+                'match_name': display_name,
                 'similarity': float(similarity),
                 'processed_image': processed_img_str,
                 'celebrity_image': celeb_img_str,
