@@ -6,7 +6,7 @@ import mediapipe as mp
 import numpy as np
 import time
 import json
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from PIL import Image
 import io
 import traceback

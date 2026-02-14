@@ -19,7 +19,7 @@ import io
 import threading
 import time
 import requests
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 import random
 import json
 
