@@ -399,7 +399,10 @@ def image_to_base64(img):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        return f"error loading page: {str(e)}", 500
 
 
 @app.route('/api/status')

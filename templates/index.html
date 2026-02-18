@@ -278,8 +278,10 @@ let matchData = null;
 let fileInput = null;
 
 async function initCamera() {
-    document.getElementById('results-view').style.display = 'none';
-    document.getElementById('camera-view').style.display = 'flex';
+    const resultsView = document.getElementById('results-view');
+    const cameraView = document.getElementById('camera-view');
+    if (resultsView) resultsView.style.display = 'none';
+    if (cameraView) cameraView.style.display = 'flex';
     
     video = document.getElementById('video');
     canvas = document.getElementById('canvas');
@@ -287,6 +289,8 @@ async function initCamera() {
         ctx = canvas.getContext('2d');
     }
     fileInput = document.getElementById('file-input');
+    
+    if (!video) return;
 
     if (currentStream) {
         const tracks = currentStream.getTracks();
@@ -318,7 +322,8 @@ async function initCamera() {
         });
         currentStream = stream;
         video.srcObject = stream;
-        document.getElementById('error-message').textContent = '';
+        const errorEl = document.getElementById('error-message');
+        if (errorEl) errorEl.textContent = '';
     } catch (err) {
         let errorMsg = '';
         const isLocalhost = window.location.hostname === 'localhost' || 
@@ -709,7 +714,11 @@ async function submitCelebritySuggestion() {
     }
 }
 
-initCamera();
+try {
+    initCamera();
+} catch (err) {
+    console.error('camera init error:', err);
+}
 </script>
 
 <style>
