@@ -537,19 +537,27 @@ def process_image():
 @app.route('/api/register_face', methods=['POST'])
 def register_face():
     try:
-        data = request.json
+        if not request.is_json:
+            return jsonify({'error': 'request must be json'}), 400
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'invalid json'}), 400
         name = data.get('name', '').strip()
         
         if not name:
             return jsonify({'error': 'name required'}), 400
         
-        if 'image' not in data:
-            return jsonify({'error': 'image required'}), 400
+        image_data = data.get('image', '')
+        if not image_data:
+            return jsonify({'error': 'image data required'}), 400
         
-        image_data = data['image']
         if ',' in image_data:
             image_data = image_data.split(',')[1]
-        image_bytes = base64.b64decode(image_data)
+        
+        try:
+            image_bytes = base64.b64decode(image_data)
+        except Exception as e:
+            return jsonify({'error': f'invalid image data: {str(e)}'}), 400
         
         celebs_dir = "celebs"
         if not os.path.exists(celebs_dir):
@@ -601,13 +609,16 @@ def register_face():
             return jsonify({'error': f'face encoding failed: {str(e)}'}), 400
         
         if matcher:
-            old_count = len(matcher.celeb_data)
-            cache_path = matcher.cache_file
-            if os.path.exists(cache_path):
-                os.remove(cache_path)
-            
-            matcher.celeb_data = []
-            matcher.load_database(force_rebuild=True)
+            def reload_db():
+                try:
+                    cache_path = matcher.cache_file
+                    if os.path.exists(cache_path):
+                        os.remove(cache_path)
+                    matcher.celeb_data = []
+                    matcher.load_database(force_rebuild=True)
+                except:
+                    pass
+            threading.Thread(target=reload_db, daemon=True).start()
         
         return jsonify({
             'success': True, 
@@ -616,7 +627,8 @@ def register_face():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_msg = str(e)
+        return jsonify({'error': f'registration failed: {error_msg}'}), 500
 
 
 def is_face_present(image_bytes):
