@@ -630,7 +630,7 @@ def is_face_present(image_bytes):
         mp_face_detection = mp.solutions.face_detection
         face_detector = mp_face_detection.FaceDetection(
             model_selection=1, 
-            min_detection_confidence=0.6
+            min_detection_confidence=0.5
         )
         results = face_detector.process(rgb_img)
         return results.detections is not None
@@ -710,8 +710,13 @@ def suggest_celebrity():
         }
         
         img_data = get_tmdb_image(name)
+        if img_data and not is_face_present(img_data):
+            img_data = None
+        
         if not img_data:
             img_data = get_wikipedia_image(name)
+            if img_data and not is_face_present(img_data):
+                img_data = None
         
         if not img_data:
             for attempt in range(2):
@@ -719,13 +724,15 @@ def suggest_celebrity():
                     if attempt > 0:
                         time.sleep(0.5)
                     with DDGS() as ddgs:
-                        results = list(ddgs.images(query=f"{name} headshot portrait", max_results=8))
-                        for r in results[:5]:
+                        results = list(ddgs.images(query=f"{name} headshot portrait", max_results=10))
+                        for r in results:
                             try:
                                 resp = requests.get(r['image'], timeout=5, headers=headers)
                                 if resp.status_code == 200:
-                                    img_data = resp.content
-                                    break
+                                    test_img = resp.content
+                                    if is_face_present(test_img):
+                                        img_data = test_img
+                                        break
                             except:
                                 continue
                         if img_data:
@@ -734,7 +741,7 @@ def suggest_celebrity():
                     if attempt < 1:
                         time.sleep(0.5)
         
-        if img_data and is_face_present(img_data):
+        if img_data:
             filename = f"{clean_name}_{int(time.time())}.jpg"
             filepath = os.path.join(celebs_dir, filename)
             
