@@ -645,14 +645,22 @@ def get_tmdb_image(name):
             return None
         url = f"https://api.themoviedb.org/3/search/person"
         params = {"api_key": TMDB_API_KEY, "query": name}
-        data = requests.get(url, params=params, timeout=3).json()
+        resp = requests.get(url, params=params, timeout=3)
+        if resp.status_code != 200:
+            return None
+        try:
+            data = resp.json()
+        except:
+            return None
         if data.get('results'):
             path = data['results'][0].get('profile_path')
             if path:
                 img_url = f"https://image.tmdb.org/t/p/h632{path}"
-                resp = requests.get(img_url, timeout=5)
-                if resp.status_code == 200:
-                    return resp.content
+                img_resp = requests.get(img_url, timeout=5)
+                if img_resp.status_code == 200 and img_resp.content and len(img_resp.content) > 1000:
+                    content_type = img_resp.headers.get('content-type', '')
+                    if 'image' in content_type:
+                        return img_resp.content
         return None
     except:
         return None
@@ -665,13 +673,21 @@ def get_wikipedia_image(name):
             "action": "query", "titles": name, "prop": "pageimages",
             "format": "json", "pithumbsize": 1000, "redirects": 1
         }
-        resp = requests.get(url, params=params, timeout=3).json()
-        pages = resp.get("query", {}).get("pages", {})
+        resp = requests.get(url, params=params, timeout=3)
+        if resp.status_code != 200:
+            return None
+        try:
+            data = resp.json()
+        except:
+            return None
+        pages = data.get("query", {}).get("pages", {})
         for p in pages.values():
             if "thumbnail" in p:
                 img_resp = requests.get(p["thumbnail"]["source"], timeout=5)
-                if img_resp.status_code == 200:
-                    return img_resp.content
+                if img_resp.status_code == 200 and img_resp.content and len(img_resp.content) > 1000:
+                    content_type = img_resp.headers.get('content-type', '')
+                    if 'image' in content_type:
+                        return img_resp.content
         return None
     except:
         return None
@@ -728,11 +744,13 @@ def suggest_celebrity():
                         for r in results:
                             try:
                                 resp = requests.get(r['image'], timeout=5, headers=headers)
-                                if resp.status_code == 200:
-                                    test_img = resp.content
-                                    if is_face_present(test_img):
-                                        img_data = test_img
-                                        break
+                                if resp.status_code == 200 and resp.content and len(resp.content) > 1000:
+                                    content_type = resp.headers.get('content-type', '')
+                                    if 'image' in content_type:
+                                        test_img = resp.content
+                                        if is_face_present(test_img):
+                                            img_data = test_img
+                                            break
                             except:
                                 continue
                         if img_data:
@@ -775,9 +793,14 @@ def suggest_celebrity():
                 }), 400
             
             if matcher:
-                if os.path.exists(matcher.cache_file):
-                    os.remove(matcher.cache_file)
-                matcher.load_database(force_rebuild=True)
+                def reload_db():
+                    try:
+                        if os.path.exists(matcher.cache_file):
+                            os.remove(matcher.cache_file)
+                        matcher.load_database(force_rebuild=True)
+                    except:
+                        pass
+                threading.Thread(target=reload_db, daemon=True).start()
             
             return jsonify({
                 'success': True,
