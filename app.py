@@ -131,9 +131,8 @@ class CelebrityMatcher:
                 
                 img_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                 
-                try:
-                    face_encs = face_recognition.face_encodings(rgb, num_jitters=1)
-                except Exception as e:
+                face_encs = safe_face_encodings(rgb, num_jitters=1)
+                if not face_encs:
                     failed_count += 1
                     continue
                 
@@ -178,9 +177,8 @@ class CelebrityMatcher:
         if small_rgb.min() < 0 or small_rgb.max() > 255:
             small_rgb = np.clip(small_rgb, 0, 255).astype(np.uint8)
         
-        try:
-            face_encs = face_recognition.face_encodings(small_rgb, num_jitters=1)
-        except Exception as e:
+        face_encs = safe_face_encodings(small_rgb, num_jitters=1)
+        if not face_encs:
             return None, None, None
         
         if not face_encs or len(face_encs) == 0:
@@ -597,9 +595,9 @@ def register_face():
                 return jsonify({'error': 'invalid image format'}), 400
             
             
-            face_encs = face_recognition.face_encodings(rgb, num_jitters=1)
+            face_encs = safe_face_encodings(rgb, num_jitters=1)
             
-            if not face_encs or len(face_encs) == 0:
+            if not face_encs:
                 if os.path.exists(filepath):
                     os.remove(filepath)
                 return jsonify({'error': 'no face detected in image'}), 400
@@ -629,6 +627,45 @@ def register_face():
     except Exception as e:
         error_msg = str(e)
         return jsonify({'error': f'registration failed: {error_msg}'}), 500
+
+
+def validate_image_array(arr):
+    if arr is None:
+        return False
+    if not isinstance(arr, np.ndarray):
+        return False
+    if len(arr.shape) != 3 or arr.shape[2] != 3:
+        return False
+    h, w = arr.shape[:2]
+    if h < 10 or w < 10 or h > 10000 or w > 10000:
+        return False
+    if arr.dtype != np.uint8:
+        return False
+    if arr.min() < 0 or arr.max() > 255:
+        return False
+    if not arr.flags['C_CONTIGUOUS']:
+        return False
+    return True
+
+
+def safe_face_encodings(rgb, num_jitters=1):
+    if not validate_image_array(rgb):
+        rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+        if not validate_image_array(rgb):
+            return []
+    
+    try:
+        h, w = rgb.shape[:2]
+        if h < 10 or w < 10:
+            return []
+        
+        if rgb.min() < 0 or rgb.max() > 255:
+            rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+            rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+        
+        return face_recognition.face_encodings(rgb, num_jitters=num_jitters)
+    except Exception:
+        return []
 
 
 def is_face_present(image_bytes):
@@ -804,8 +841,8 @@ def suggest_celebrity():
                     rgb = cv2.resize(rgb, (new_w, new_h))
                     rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
-                face_encs = face_recognition.face_encodings(rgb, num_jitters=1)
-                if not face_encs or len(face_encs) == 0:
+                face_encs = safe_face_encodings(rgb, num_jitters=1)
+                if not face_encs:
                     return jsonify({
                         'error': f'no face detected in image for {name}'
                     }), 400
@@ -880,8 +917,8 @@ def upload_image():
                 rgb = cv2.resize(rgb, (new_w, new_h))
                 rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
             
-            face_encs = face_recognition.face_encodings(rgb)
-            if not face_encs or len(face_encs) == 0:
+            face_encs = safe_face_encodings(rgb)
+            if not face_encs:
                 return jsonify({'error': 'no face detected in image'}), 400
             
             img_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
@@ -952,8 +989,8 @@ def upload_bulk():
                 rgb = face_recognition.load_image_file(filepath)
                 rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
                 
-                face_encs = face_recognition.face_encodings(rgb, num_jitters=1)
-                if not face_encs or len(face_encs) == 0:
+                face_encs = safe_face_encodings(rgb, num_jitters=1)
+                if not face_encs:
                     os.remove(filepath)
                     failed += 1
                     results.append({'file': file.filename, 'status': 'failed', 'reason': 'no face detected'})
