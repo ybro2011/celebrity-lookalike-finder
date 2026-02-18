@@ -20,15 +20,11 @@ import threading
 import time
 import requests
 from ddgs import DDGS
-import random
-import json
 import re
 
 app = Flask(__name__)
 
 matcher = None
-_db_version = 0
-_db_version_lock = threading.Lock()
 
 
 def format_celebrity_name(filename_name):
@@ -225,7 +221,7 @@ def calculate_face_statistics(user_lms, match_lms):
     
     LEFT_EYE_INDICES = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
     RIGHT_EYE_INDICES = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
-    NOSE_INDICES = [1, 2, 5, 4, 6, 19, 20, 94, 125, 141, 235, 236, 3, 51, 48, 115, 131, 134, 102, 49, 220, 305, 290, 305, 290, 305]
+    NOSE_INDICES = [1, 2, 5, 4, 6, 19, 20, 94, 125, 141, 235, 236, 3, 51, 48, 115, 131, 134, 102, 49, 220, 305, 290]
     MOUTH_INDICES = [61, 146, 91, 181, 84, 17, 314, 405, 320, 307, 375, 321, 308, 324, 318]
     FACE_OVAL_INDICES = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136]
     
@@ -633,7 +629,7 @@ def is_face_present(image_bytes):
             min_detection_confidence=0.5
         )
         results = face_detector.process(rgb_img)
-        return results.detections is not None
+        return results.detections is not None and len(results.detections) > 0
     except:
         return False
 
@@ -809,7 +805,7 @@ def suggest_celebrity():
             })
         else:
             return jsonify({
-                'error': f'couldnt find a face image for {name}, try different name'
+                'error': f"couldn't find a face image for {name}, try different name"
             }), 400
         
     except Exception as e:
@@ -864,9 +860,14 @@ def upload_image():
             return jsonify({'error': f'failed to process image: {str(e)}'}), 400
         
         if matcher:
-            if os.path.exists(matcher.cache_file):
-                os.remove(matcher.cache_file)
-            matcher.load_database(force_rebuild=True)
+            def reload_db():
+                try:
+                    if os.path.exists(matcher.cache_file):
+                        os.remove(matcher.cache_file)
+                    matcher.load_database(force_rebuild=True)
+                except:
+                    pass
+            threading.Thread(target=reload_db, daemon=True).start()
         
         return jsonify({
             'success': True,
@@ -938,9 +939,14 @@ def upload_bulk():
                 results.append({'file': file.filename, 'status': 'failed', 'reason': str(e)})
         
         if matcher and added > 0:
-            if os.path.exists(matcher.cache_file):
-                os.remove(matcher.cache_file)
-            matcher.load_database(force_rebuild=True)
+            def reload_db():
+                try:
+                    if os.path.exists(matcher.cache_file):
+                        os.remove(matcher.cache_file)
+                    matcher.load_database(force_rebuild=True)
+                except:
+                    pass
+            threading.Thread(target=reload_db, daemon=True).start()
         
         return jsonify({
             'success': True,
