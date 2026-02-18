@@ -611,7 +611,7 @@ def register_face():
         
         return jsonify({
             'success': True, 
-            'message': f'registered {name} successfully!',
+            'message': f'successfully added {name} to database!',
             'count': len(matcher.celeb_data) if matcher else 0
         })
         

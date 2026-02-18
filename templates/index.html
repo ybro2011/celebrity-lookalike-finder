@@ -588,17 +588,28 @@ function tryAgain() {
 
 async function registerFace() {
     const name = document.getElementById('register-name').value.trim();
+    const msgEl = document.getElementById('register-message');
+    
     if (!name) {
-        document.getElementById('register-message').textContent = 'need a name';
-        document.getElementById('register-message').style.color = '#ff6b6b';
+        msgEl.textContent = 'need a name';
+        msgEl.style.color = '#ff6b6b';
+        msgEl.style.fontWeight = 'normal';
+        msgEl.style.fontSize = '';
         return;
     }
     
     if (!currentImageData) {
-        document.getElementById('register-message').textContent = 'no image to register';
-        document.getElementById('register-message').style.color = '#ff6b6b';
+        msgEl.textContent = 'no image to register';
+        msgEl.style.color = '#ff6b6b';
+        msgEl.style.fontWeight = 'normal';
+        msgEl.style.fontSize = '';
         return;
     }
+    
+    msgEl.textContent = 'adding your face...';
+    msgEl.style.color = '#4dabf7';
+    msgEl.style.fontWeight = 'normal';
+    msgEl.style.fontSize = '';
     
     try {
         const response = await fetch('/api/register_face', {
@@ -609,24 +620,38 @@ async function registerFace() {
         
         const text = await response.text();
         if (!text) {
-            document.getElementById('register-message').textContent = 'empty response';
-            document.getElementById('register-message').style.color = '#ff6b6b';
+            msgEl.textContent = 'empty response';
+            msgEl.style.color = '#ff6b6b';
+            msgEl.style.fontWeight = 'normal';
+            msgEl.style.fontSize = '';
             return;
         }
         
         const data = JSON.parse(text);
         
         if (data.error) {
-            document.getElementById('register-message').textContent = data.error;
-            document.getElementById('register-message').style.color = '#ff6b6b';
+            msgEl.textContent = data.error;
+            msgEl.style.color = '#ff6b6b';
+            msgEl.style.fontWeight = 'normal';
+            msgEl.style.fontSize = '';
         } else {
-            document.getElementById('register-message').textContent = data.message;
-            document.getElementById('register-message').style.color = '#51cf66';
+            msgEl.textContent = '✓ Successfully added ' + name + '!';
+            msgEl.style.color = '#51cf66';
+            msgEl.style.fontWeight = 'bold';
+            msgEl.style.fontSize = '1.1em';
             document.getElementById('register-name').value = '';
+            
+            setTimeout(() => {
+                msgEl.style.fontSize = '';
+                msgEl.style.fontWeight = 'normal';
+            }, 5000);
         }
     } catch (err) {
-        document.getElementById('register-message').textContent = 'Error: ' + err.message;
-        document.getElementById('register-message').style.color = '#ff6b6b';
+        const msgEl = document.getElementById('register-message');
+        msgEl.textContent = 'Error: ' + err.message;
+        msgEl.style.color = '#ff6b6b';
+        msgEl.style.fontWeight = 'normal';
+        msgEl.style.fontSize = '';
     }
 }
 
