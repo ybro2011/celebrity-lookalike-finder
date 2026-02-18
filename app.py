@@ -443,7 +443,7 @@ def trigger_seed():
     def seed_background():
         try:
             from seed_celebs import seed_celebs
-                added = seed_celebs()
+            added = seed_celebs()
             if matcher:
                 if os.path.exists(matcher.cache_file):
                     os.remove(matcher.cache_file)
