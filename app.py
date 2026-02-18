@@ -707,7 +707,12 @@ def get_wikipedia_image(name):
 @app.route('/api/suggest_celebrity', methods=['POST'])
 def suggest_celebrity():
     try:
-        data = request.json
+        if not request.is_json:
+            return jsonify({'error': 'request must be json'}), 400
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'invalid json'}), 400
+        
         name = data.get('name', '').strip()
         
         if not name:
@@ -719,12 +724,21 @@ def suggest_celebrity():
         
         clean_name = name.replace(" ", "_").lower()
         
-        existing_files = [f for f in os.listdir(celebs_dir) if f.lower().startswith(clean_name)]
+        try:
+            existing_files = [f for f in os.listdir(celebs_dir) if f.lower().startswith(clean_name)]
+        except Exception as e:
+            return jsonify({'error': f'failed to check existing files: {str(e)}'}), 500
+        
         if existing_files:
             if matcher:
-                if os.path.exists(matcher.cache_file):
-                    os.remove(matcher.cache_file)
-                matcher.load_database(force_rebuild=True)
+                def reload_db():
+                    try:
+                        if os.path.exists(matcher.cache_file):
+                            os.remove(matcher.cache_file)
+                        matcher.load_database(force_rebuild=True)
+                    except:
+                        pass
+                threading.Thread(target=reload_db, daemon=True).start()
             return jsonify({
                 'success': True, 
                 'message': f'{name} already exists!',
@@ -824,7 +838,8 @@ def suggest_celebrity():
             }), 400
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_msg = str(e)
+        return jsonify({'error': f'failed to add celebrity: {error_msg}'}), 500
 
 
 @app.route('/api/upload_image', methods=['POST'])
